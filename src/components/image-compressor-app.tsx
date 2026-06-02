@@ -67,6 +67,22 @@ export function ImageCompressorApp() {
   const [processedCount, setProcessedCount] = useState(0);
   const imagesRef = useRef<QueueImage[]>([]);
 
+  const handleSettingsChange = useCallback((newSettings: CompressionSettings) => {
+    setSettings(newSettings);
+    localStorage.setItem("compact-img-settings", JSON.stringify(newSettings));
+  }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("compact-img-settings");
+    if (saved) {
+      try {
+        setSettings(JSON.parse(saved));
+      } catch (e) {
+        console.error("Erro ao carregar configuracoes:", e);
+      }
+    }
+  }, []);
+
   const selectedImage = useMemo(
     () => images.find((image) => image.id === selectedId) ?? images[0],
     [images, selectedId]
@@ -228,78 +244,84 @@ export function ImageCompressorApp() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 lg:grid-cols-[1fr_340px] lg:px-6">
-        <div className="grid gap-5">
-          <ImageDropzone onFiles={addFiles} onInvalidFiles={setInvalidFiles} />
-
-          {invalidFiles.length ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              Arquivos ignorados: {invalidFiles.join(", ")}
-            </div>
-          ) : null}
-
-          <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
-              <CardTitle>Acoes do lote</CardTitle>
-              <span className="text-sm text-muted-foreground">
-                {formatBytes(totalOriginal)}
-                {totalCompressed ? ` -> ${formatBytes(totalCompressed)}` : ""}
-                {totalReduction !== undefined ? ` (${totalReduction.toFixed(1)}% menor)` : ""}
-              </span>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <DownloadActions
-                images={images}
-                isProcessing={isProcessing}
-                onProcess={processBatch}
-                onClear={clearAll}
-              />
-              {isProcessing ? (
-                <ProgressBar value={progress} label={`${processedCount} de ${images.length} imagens processadas`} />
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <ImageQueue
-            images={images}
-            selectedId={selectedImage?.id}
-            isProcessing={isProcessing}
-            onSelect={setSelectedId}
-            onRemove={removeImage}
-          />
+      <div className="mx-auto flex flex-col gap-5 px-4 py-5 lg:px-6 max-w-7xl">
+        {/* Row 1: ImageDropzone and CompressionSettings side-by-side on desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+          <div className="lg:col-span-2">
+            <ImageDropzone onFiles={addFiles} onInvalidFiles={setInvalidFiles} />
+          </div>
+          <div>
+            <CompressionSettingsPanel settings={settings} onChange={handleSettingsChange} disabled={isProcessing} />
+          </div>
         </div>
 
-        <aside className="grid gap-5 self-start">
-          <CompressionSettingsPanel settings={settings} onChange={setSettings} disabled={isProcessing} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {selectedImage ? (
-                <div className="grid gap-3">
-                  <BeforeAfterSlider
-                    beforeUrl={selectedImage.originalUrl}
-                    afterUrl={selectedImage.compressedUrl}
-                    alt={selectedImage.file.name}
-                  />
-                  <div className="text-sm">
-                    <p className="truncate font-medium">{selectedImage.file.name}</p>
-                    <p className="text-muted-foreground">
-                      {selectedImage.status === "done"
-                        ? "Arraste o controle para comparar antes e depois."
-                        : "Compacte a imagem para ver a comparacao."}
-                    </p>
-                  </div>
+        {invalidFiles.length ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            Arquivos ignorados: {invalidFiles.join(", ")}
+          </div>
+        ) : null}
+
+        {/* Row 2: Batch actions card */}
+        <Card className="w-full">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle>Acoes do lote</CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {formatBytes(totalOriginal)}
+              {totalCompressed ? ` -> ${formatBytes(totalCompressed)}` : ""}
+              {totalReduction !== undefined ? ` (${totalReduction.toFixed(1)}% menor)` : ""}
+            </span>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <DownloadActions
+              images={images}
+              isProcessing={isProcessing}
+              onProcess={processBatch}
+              onClear={clearAll}
+            />
+            {isProcessing ? (
+              <ProgressBar value={progress} label={`${processedCount} de ${images.length} imagens processadas`} />
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Row 3: Preview card (full width row, below batch actions, above queue) */}
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Preview</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {selectedImage ? (
+              <div className="grid gap-4 max-w-3xl mx-auto w-full">
+                <BeforeAfterSlider
+                  beforeUrl={selectedImage.originalUrl}
+                  afterUrl={selectedImage.compressedUrl}
+                  alt={selectedImage.file.name}
+                />
+                <div className="text-sm">
+                  <p className="truncate font-medium">{selectedImage.file.name}</p>
+                  <p className="text-muted-foreground">
+                    {selectedImage.status === "done"
+                      ? "Arraste o controle para comparar antes e depois."
+                      : "Compacte a imagem para ver a comparacao."}
+                  </p>
                 </div>
-              ) : (
-                <div className="rounded-md border bg-muted/40 p-6 text-center text-sm text-muted-foreground">
-                  Selecione uma imagem para visualizar.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </aside>
+              </div>
+            ) : (
+              <div className="rounded-md border bg-muted/40 p-6 text-center text-sm text-muted-foreground">
+                Selecione uma imagem para visualizar.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Row 4: ImageQueue */}
+        <ImageQueue
+          images={images}
+          selectedId={selectedImage?.id}
+          isProcessing={isProcessing}
+          onSelect={setSelectedId}
+          onRemove={removeImage}
+        />
       </div>
     </main>
   );

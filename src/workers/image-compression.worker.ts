@@ -1,4 +1,4 @@
-import type { WorkerRequest, WorkerResponse } from "@/lib/image-types";
+import type { WorkerRequest, WorkerResponse } from "../lib/image-types";
 
 const MIME_BY_FORMAT = {
   jpeg: "image/jpeg",
