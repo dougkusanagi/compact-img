@@ -10,7 +10,6 @@ import type {
 } from "@/lib/image-types";
 import { createImageId, isAcceptedImage, readImageDimensions } from "@/lib/image-utils";
 import { formatBytes, getReduction, replaceExtension } from "@/lib/utils";
-import { BeforeAfterSlider } from "@/components/before-after-slider";
 import { CompressionSettings as CompressionSettingsPanel } from "@/components/compression-settings";
 import { DownloadActions } from "@/components/download-actions";
 import { ImageDropzone } from "@/components/image-dropzone";
@@ -284,37 +283,7 @@ export function ImageCompressorApp() {
           </CardContent>
         </Card>
 
-        {/* Row 3: Preview card (full width row, below batch actions, above queue) */}
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>Preview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {selectedImage ? (
-              <div className="grid gap-4 max-w-3xl mx-auto w-full">
-                <BeforeAfterSlider
-                  beforeUrl={selectedImage.originalUrl}
-                  afterUrl={selectedImage.compressedUrl}
-                  alt={selectedImage.file.name}
-                />
-                <div className="text-sm">
-                  <p className="truncate font-medium">{selectedImage.file.name}</p>
-                  <p className="text-muted-foreground">
-                    {selectedImage.status === "done"
-                      ? "Arraste o controle para comparar antes e depois."
-                      : "Compacte a imagem para ver a comparacao."}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-md border bg-muted/40 p-6 text-center text-sm text-muted-foreground">
-                Selecione uma imagem para visualizar.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Row 4: ImageQueue */}
+        {/* Row 3: ImageQueue */}
         <ImageQueue
           images={images}
           selectedId={selectedImage?.id}

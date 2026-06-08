@@ -22,6 +22,21 @@ bun run dev
 
 Abra `http://localhost:3000`.
 
+## Gerando executavel
+
+O app tambem pode ser empacotado como desktop via Electron. O build web continua sendo gerado pelo Next em modo estatico e o Electron carrega os arquivos exportados.
+
+```bash
+bun install
+bun run desktop:dist
+```
+
+Os artefatos ficam em `dist/`. Para gerar uma pasta empacotada sem instalador:
+
+```bash
+bun run desktop:pack
+```
+
 ## Observações
 
 - AVIF depende do suporte do navegador para codificação via canvas/OffscreenCanvas.
