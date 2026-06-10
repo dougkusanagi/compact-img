@@ -1,128 +1,236 @@
 "use client";
 
-import { Download, Trash2 } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  Download,
+  Eye,
+  HardDrive,
+  LoaderCircle,
+  Trash2
+} from "lucide-react";
 import type { QueueImage } from "@/lib/image-types";
 import { downloadBlob } from "@/lib/download";
 import { formatBytes, formatPercent, getReduction } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ImagePreview } from "@/components/image-preview";
+import { BeforeAfterSlider } from "@/components/before-after-slider";
 
 type ImageQueueProps = {
   images: QueueImage[];
   selectedId?: string;
   isProcessing?: boolean;
+  isDesktop?: boolean;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
 };
 
-const STATUS_LABELS: Record<QueueImage["status"], string> = {
-  pending: "Pendente",
-  processing: "Processando",
-  done: "Concluida",
-  error: "Erro"
+const STATUS_CONFIG: Record<
+  QueueImage["status"],
+  { label: string; className: string; icon: typeof Clock3 }
+> = {
+  pending: {
+    label: "Pendente",
+    className: "bg-muted text-muted-foreground",
+    icon: Clock3
+  },
+  processing: {
+    label: "Processando",
+    className: "bg-primary/10 text-primary",
+    icon: LoaderCircle
+  },
+  done: {
+    label: "Concluída",
+    className: "bg-emerald-50 text-emerald-700",
+    icon: CheckCircle2
+  },
+  error: {
+    label: "Erro",
+    className: "bg-destructive/10 text-destructive",
+    icon: AlertCircle
+  }
 };
 
-export function ImageQueue({ images, selectedId, isProcessing, onSelect, onRemove }: ImageQueueProps) {
+export function ImageQueue({ images, selectedId, isProcessing, isDesktop, onSelect, onRemove }: ImageQueueProps) {
+  const [previewId, setPreviewId] = useState<string | null>(null);
+
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle>Fila de imagens</CardTitle>
-        <span className="text-sm text-muted-foreground">{images.length} arquivo(s)</span>
+    <Card className="overflow-hidden">
+      <CardHeader className="flex-row items-center justify-between space-y-0 border-b">
+        <div>
+          <CardTitle>Suas imagens</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">Acompanhe e compare cada resultado</p>
+        </div>
+        <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+          {images.length}
+        </span>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {images.length === 0 ? (
-          <div className="rounded-md border bg-muted/40 p-6 text-center text-sm text-muted-foreground">
-            Nenhuma imagem carregada.
+          <div className="flex min-h-44 flex-col items-center justify-center p-6 text-center">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <Eye className="h-4 w-4" />
+            </div>
+            <p className="text-sm font-semibold">Nenhuma imagem adicionada</p>
+            <p className="mt-1 text-xs text-muted-foreground">Seus arquivos aparecerão aqui.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="border-b text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="py-3 pr-3">Imagem</th>
-                  <th className="px-3 py-3">Arquivo</th>
-                  <th className="px-3 py-3">Original</th>
-                  <th className="px-3 py-3">Compactado</th>
-                  <th className="px-3 py-3">Reducao</th>
-                  <th className="px-3 py-3">Dimensoes</th>
-                  <th className="px-3 py-3">Finais</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="py-3 pl-3 text-right">Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {images.map((image) => {
-                  const reduction = getReduction(image.file.size, image.compressedBlob?.size);
-                  return (
-                    <tr
-                      key={image.id}
-                      className={selectedId === image.id ? "border-b bg-primary/5" : "border-b"}
-                      onClick={() => onSelect(image.id)}
-                    >
-                      <td className="py-3 pr-3">
-                        <img
-                          src={image.originalUrl}
-                          alt={image.file.name}
-                          className="h-14 w-20 rounded object-cover"
-                        />
-                      </td>
-                      <td className="max-w-56 truncate px-3 py-3 font-medium">{image.file.name}</td>
-                      <td className="px-3 py-3">{formatBytes(image.file.size)}</td>
-                      <td className="px-3 py-3">
-                        {image.compressedBlob ? formatBytes(image.compressedBlob.size) : "-"}
-                      </td>
-                      <td className="px-3 py-3">{reduction === undefined ? "-" : formatPercent(reduction)}</td>
-                      <td className="px-3 py-3">
-                        {image.originalDimensions
-                          ? `${image.originalDimensions.width}x${image.originalDimensions.height}`
-                          : "-"}
-                      </td>
-                      <td className="px-3 py-3">
-                        {image.finalDimensions ? `${image.finalDimensions.width}x${image.finalDimensions.height}` : "-"}
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className="rounded bg-muted px-2 py-1 text-xs font-medium">
-                          {STATUS_LABELS[image.status]}
-                        </span>
-                        {image.error ? <p className="mt-1 max-w-52 text-xs text-destructive">{image.error}</p> : null}
-                      </td>
-                      <td className="py-3 pl-3">
-                        <div className="flex justify-end gap-2">
-                          <ImagePreview image={image} />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            disabled={!image.compressedBlob || !image.compressedName}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (image.compressedBlob && image.compressedName) {
-                                downloadBlob(image.compressedBlob, image.compressedName);
-                              }
-                            }}
-                            aria-label="Baixar imagem"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            disabled={isProcessing}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onRemove(image.id);
-                            }}
-                            aria-label="Remover imagem"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+          <div className="divide-y">
+            {images.map((image) => {
+              const reduction = getReduction(image.file.size, image.compressedBlob?.size);
+              const isPreviewOpen = previewId === image.id;
+              const status = STATUS_CONFIG[image.status];
+              const StatusIcon = status.icon;
+
+              return (
+                <article
+                  key={image.id}
+                  className={cn(
+                    "transition-colors duration-200",
+                    selectedId === image.id ? "bg-primary/[0.025]" : "hover:bg-muted/20"
+                  )}
+                >
+                  <div
+                    className="grid cursor-pointer gap-4 p-4 sm:grid-cols-[84px_minmax(0,1fr)_auto] sm:items-center"
+                    onClick={() => onSelect(image.id)}
+                  >
+                    <div className="relative h-20 w-full overflow-hidden rounded-md bg-muted sm:w-[84px]">
+                      <img src={image.originalUrl} alt={image.file.name} className="h-full w-full object-cover" />
+                      {image.status === "done" ? (
+                        <div className="absolute bottom-1.5 right-1.5 rounded-full bg-emerald-500 p-1 text-white shadow">
+                          <CheckCircle2 className="h-3 w-3" />
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      ) : null}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="max-w-full truncate text-sm font-bold" title={image.file.name}>
+                          {image.file.name}
+                        </p>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                            status.className
+                          )}
+                        >
+                          <StatusIcon
+                            className={cn("h-3 w-3", image.status === "processing" && "animate-spin")}
+                          />
+                          {status.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>{formatBytes(image.file.size)}</span>
+                        <span>
+                          {image.originalDimensions
+                            ? `${image.originalDimensions.width} × ${image.originalDimensions.height}px`
+                            : "Lendo dimensões..."}
+                        </span>
+                        {image.compressedBlob ? (
+                          <span className="font-medium text-foreground">
+                            {formatBytes(image.compressedBlob.size)}
+                          </span>
+                        ) : null}
+                        {reduction !== undefined ? (
+                          <span className="font-bold text-emerald-700">{formatPercent(reduction)} menor</span>
+                        ) : null}
+                      </div>
+
+                      {image.error ? <p className="mt-2 text-xs text-destructive">{image.error}</p> : null}
+                      {image.savedPath ? (
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" title={image.savedPath}>
+                          <HardDrive className="h-3 w-3" />
+                          Salva na pasta original
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant={isPreviewOpen ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setPreviewId(isPreviewOpen ? null : image.id);
+                        }}
+                        aria-label="Visualizar comparação"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span className="hidden md:inline">Comparar</span>
+                        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isPreviewOpen && "rotate-180")} />
+                      </Button>
+                      {!isDesktop ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={!image.compressedBlob || !image.compressedName}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (image.compressedBlob && image.compressedName) {
+                              downloadBlob(image.compressedBlob, image.compressedName);
+                            }
+                          }}
+                          aria-label="Baixar imagem"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        disabled={isProcessing}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRemove(image.id);
+                          if (isPreviewOpen) {
+                            setPreviewId(null);
+                          }
+                        }}
+                        aria-label="Remover imagem"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {isPreviewOpen ? (
+                    <div className="animate-in slide-in-from-top-2 border-t bg-muted/25 p-4 duration-300 sm:p-5">
+                      <div className="mx-auto max-w-3xl">
+                        <BeforeAfterSlider
+                          beforeUrl={image.originalUrl}
+                          afterUrl={image.compressedUrl}
+                          alt={image.file.name}
+                        />
+                        <div className="mt-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                          <p className="text-xs text-muted-foreground">
+                            {image.status === "done"
+                              ? "Arraste o controle para comparar o original e o resultado."
+                              : "Compacte a imagem para visualizar a comparação."}
+                          </p>
+                          {!isDesktop && image.compressedBlob && image.compressedName ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadBlob(image.compressedBlob as Blob, image.compressedName as string)}
+                            >
+                              <Download className="h-4 w-4" />
+                              Baixar imagem
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         )}
       </CardContent>

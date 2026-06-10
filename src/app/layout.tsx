@@ -3,7 +3,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Compact Img",
-  description: "Compactador de imagens em lote, 100% local no navegador."
+  description: "Compactador desktop de imagens em lote, 100% local.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png"
+  }
 };
 
 export default function RootLayout({

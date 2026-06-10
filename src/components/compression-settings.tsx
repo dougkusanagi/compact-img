@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { CompressionSettings as CompressionSettingsType } from "@/lib/image-types";
 import type { OutputFormat } from "@/lib/utils";
+import { Gauge, ImageIcon, Maximize2, Settings2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,38 +53,52 @@ export function CompressionSettings({ settings, onChange, disabled }: Compressio
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Configuracoes</CardTitle>
+    <Card className="overflow-hidden">
+      <CardHeader className="flex-row items-center gap-3 space-y-0 border-b bg-muted/30">
+        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Settings2 className="h-4 w-4" />
+        </div>
+        <div>
+          <CardTitle>Configurações</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">Defina o resultado final</p>
+        </div>
       </CardHeader>
-      <CardContent className="grid gap-5 sm:grid-cols-2 xl:grid-cols-1">
-        <div className="grid gap-2">
-          <Label htmlFor="max-width">Largura maxima</Label>
+      <CardContent className="grid gap-5 p-5">
+        <div className="grid gap-3">
+          <div className="flex items-center gap-2">
+            <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label>Dimensões máximas</Label>
+          </div>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <Input
             id="max-width"
             type="number"
             min={1}
             value={settings.maxWidth}
             disabled={disabled}
+            aria-label="Largura máxima"
             onChange={(event) => update("maxWidth", Number(event.target.value) || 1)}
           />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="max-height">Altura maxima</Label>
+          <span className="text-xs font-medium text-muted-foreground">×</span>
           <Input
             id="max-height"
             type="number"
             min={1}
             value={settings.maxHeight}
             disabled={disabled}
+            aria-label="Altura máxima"
             onChange={(event) => update("maxHeight", Number(event.target.value) || 1)}
           />
+          </div>
+          <p className="text-xs text-muted-foreground">Largura × altura em pixels</p>
         </div>
 
-        <div className="grid gap-3 sm:col-span-2 xl:col-span-1">
+        <div className="grid gap-3 border-t pt-5">
           <div className="flex items-center justify-between gap-4">
-            <Label htmlFor="quality-input">Qualidade</Label>
+            <div className="flex items-center gap-2">
+              <Gauge className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label htmlFor="quality-input">Qualidade</Label>
+            </div>
             <div className="flex items-center gap-1">
               <Input
                 id="quality-input"
@@ -109,8 +124,11 @@ export function CompressionSettings({ settings, onChange, disabled }: Compressio
           />
         </div>
 
-        <div className="grid gap-2">
-          <Label>Formato de saida</Label>
+        <div className="grid gap-2 border-t pt-5">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label>Formato de saída</Label>
+          </div>
           <Select
             value={settings.outputFormat}
             disabled={disabled}
@@ -128,8 +146,8 @@ export function CompressionSettings({ settings, onChange, disabled }: Compressio
           </Select>
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
-          <Label htmlFor="aspect">Manter proporcao</Label>
+        <div className="flex items-center justify-between gap-4 rounded-md bg-muted/55 p-3">
+          <Label htmlFor="aspect">Manter proporção</Label>
           <Switch
             id="aspect"
             checked={settings.keepAspectRatio}
@@ -138,7 +156,7 @@ export function CompressionSettings({ settings, onChange, disabled }: Compressio
           />
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+        <div className="flex items-center justify-between gap-4 rounded-md bg-muted/55 p-3">
           <Label htmlFor="metadata">Remover metadados</Label>
           <Switch
             id="metadata"

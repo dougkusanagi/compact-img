@@ -23,3 +23,10 @@ export async function downloadImagesZip(images: QueueImage[]) {
   const blob = await zip.generateAsync({ type: "blob" });
   downloadBlob(blob, "imagens-compactadas.zip");
 }
+
+export function downloadImagesIndividual(images: QueueImage[]) {
+  const readyImages = images.filter((image) => image.compressedBlob && image.compressedName);
+  readyImages.forEach((image) => {
+    downloadBlob(image.compressedBlob as Blob, image.compressedName as string);
+  });
+}
