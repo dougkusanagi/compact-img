@@ -27,9 +27,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "msi"
+    ],
     "category": "GraphicsAndDesign",
     "shortDescription": "Compactacao local de imagens em lote.",
+    "longDescription": "Compacta imagens em lote localmente, sem enviar arquivos para servidores.",
+    "copyright": "Copyright (c) 2026 Douglas Kusanagi",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

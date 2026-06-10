@@ -19,14 +19,20 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BeforeAfterSlider } from "@/components/before-after-slider";
+import { DownloadActions } from "@/components/download-actions";
+import { ProgressBar } from "@/components/progress-bar";
 
 type ImageQueueProps = {
   images: QueueImage[];
   selectedId?: string;
   isProcessing?: boolean;
   isDesktop?: boolean;
+  progress: number;
+  processedCount: number;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
+  onProcess: () => void;
+  onClear: () => void;
 };
 
 const STATUS_CONFIG: Record<
@@ -55,20 +61,46 @@ const STATUS_CONFIG: Record<
   }
 };
 
-export function ImageQueue({ images, selectedId, isProcessing, isDesktop, onSelect, onRemove }: ImageQueueProps) {
+export function ImageQueue({
+  images,
+  selectedId,
+  isProcessing = false,
+  isDesktop = false,
+  progress,
+  processedCount,
+  onSelect,
+  onRemove,
+  onProcess,
+  onClear
+}: ImageQueueProps) {
   const [previewId, setPreviewId] = useState<string | null>(null);
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="flex-row items-center justify-between space-y-0 border-b">
-        <div>
-          <CardTitle>Suas imagens</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">Acompanhe e compare cada resultado</p>
+      <CardHeader className="space-y-3 border-b sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+        <div className="flex items-center gap-3">
+          <div>
+            <CardTitle>Suas imagens</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">Acompanhe e compare cada resultado</p>
+          </div>
+          <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+            {images.length}
+          </span>
         </div>
-        <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-          {images.length}
-        </span>
+        <DownloadActions
+          images={images}
+          isProcessing={isProcessing}
+          isDesktop={isDesktop}
+          onProcess={onProcess}
+          onClear={onClear}
+          compact
+        />
       </CardHeader>
+      {isProcessing ? (
+        <div className="border-b px-6 py-3">
+          <ProgressBar value={progress} label={`${processedCount} de ${images.length} imagens processadas`} />
+        </div>
+      ) : null}
       <CardContent className="p-0">
         {images.length === 0 ? (
           <div className="flex min-h-44 flex-col items-center justify-center p-6 text-center">

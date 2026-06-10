@@ -38,7 +38,38 @@ bun run desktop:dev
 bun run desktop:build
 ```
 
-Os artefatos ficam em `src-tauri/target/release/bundle/`.
+O build Windows gera somente o MSI do Tauri em
+`src-tauri/target/release/bundle/msi/`.
+
+Para gerar uma release e verificar assinatura, Microsoft Defender e SHA-256:
+
+```powershell
+bun run desktop:dist
+```
+
+O comando tambem cria um arquivo `.sha256` ao lado do instalador.
+
+## Distribuicao no Windows
+
+Um executavel novo e sem assinatura pode ser bloqueado pelo Microsoft Defender
+ou pelo SmartScreen por falta de reputacao, mesmo quando nao contem malware.
+O projeto antigo em Electron gerava `dist/Compact Img Setup 0.1.0.exe`; esse
+arquivo nao e mais o instalador atual e nao deve ser distribuido. Use apenas o
+MSI gerado pelo Tauri.
+
+Para distribuicao publica:
+
+1. Obtenha um certificado de assinatura de codigo emitido por uma autoridade
+   confiavel ou configure o Azure Artifact Signing.
+2. Configure a assinatura do Tauri e mantenha o mesmo certificado nas releases.
+3. Execute `bun run desktop:dist` e confirme que a saida mostra
+   `Assinatura: valida`.
+4. Publique o MSI junto com o arquivo `.sha256`.
+5. Se uma versao assinada ainda for detectada, envie exatamente esse MSI para
+   analise no portal Microsoft Security Intelligence como desenvolvedor.
+
+Um certificado autoassinado serve para testes internos, mas nao cria confianca
+nos computadores dos usuarios e nao resolve a reputacao do SmartScreen.
 
 ## Observações
 

@@ -4,6 +4,7 @@ import { Download, Play, RotateCcw, Trash2 } from "lucide-react";
 import type { QueueImage } from "@/lib/image-types";
 import { downloadImagesIndividual, downloadImagesZip } from "@/lib/download";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type DownloadActionsProps = {
   images: QueueImage[];
@@ -11,16 +12,24 @@ type DownloadActionsProps = {
   isDesktop: boolean;
   onProcess: () => void;
   onClear: () => void;
+  compact?: boolean;
 };
 
-export function DownloadActions({ images, isProcessing, isDesktop, onProcess, onClear }: DownloadActionsProps) {
+export function DownloadActions({
+  images,
+  isProcessing,
+  isDesktop,
+  onProcess,
+  onClear,
+  compact = false
+}: DownloadActionsProps) {
   const hasImages = images.length > 0;
   const hasCompressed = images.some((image) => image.compressedBlob);
   const hasProcessed = images.some((image) => image.status === "done" || image.status === "error");
 
   return (
-    <div className="grid gap-2">
-      <Button className="w-full" disabled={!hasImages || isProcessing} onClick={onProcess}>
+    <div className={cn("grid gap-2", compact && "flex flex-wrap justify-end")}>
+      <Button className={cn(!compact && "w-full")} size={compact ? "sm" : "default"} disabled={!hasImages || isProcessing} onClick={onProcess}>
         {hasProcessed ? <RotateCcw className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         {hasProcessed
           ? isDesktop
@@ -34,7 +43,8 @@ export function DownloadActions({ images, isProcessing, isDesktop, onProcess, on
         <>
           <Button
             variant="outline"
-            className="w-full"
+            className={cn(!compact && "w-full")}
+            size={compact ? "sm" : "default"}
             disabled={!hasCompressed || isProcessing}
             onClick={() => downloadImagesIndividual(images)}
           >
@@ -43,7 +53,8 @@ export function DownloadActions({ images, isProcessing, isDesktop, onProcess, on
           </Button>
           <Button
             variant="outline"
-            className="w-full"
+            className={cn(!compact && "w-full")}
+            size={compact ? "sm" : "default"}
             disabled={!hasCompressed || isProcessing}
             onClick={() => downloadImagesZip(images)}
           >
@@ -52,7 +63,13 @@ export function DownloadActions({ images, isProcessing, isDesktop, onProcess, on
           </Button>
         </>
       ) : null}
-      <Button className="w-full text-muted-foreground" variant="ghost" disabled={!hasImages || isProcessing} onClick={onClear}>
+      <Button
+        className={cn("text-muted-foreground", !compact && "w-full")}
+        variant="ghost"
+        size={compact ? "sm" : "default"}
+        disabled={!hasImages || isProcessing}
+        onClick={onClear}
+      >
         <Trash2 className="h-4 w-4" />
         Limpar tudo
       </Button>

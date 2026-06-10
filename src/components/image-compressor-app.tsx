@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LockKeyhole, Settings2, Sparkles } from "lucide-react";
+import { LockKeyhole, Sparkles } from "lucide-react";
 import type {
   CompressionSettings,
   QueueImage,
@@ -11,13 +11,10 @@ import type {
 } from "@/lib/image-types";
 import { createImageId, isAcceptedImage, readImageDimensions } from "@/lib/image-utils";
 import { isDesktopApp, saveCompressedImage } from "@/lib/desktop";
-import { formatBytes, getReduction, replaceExtension } from "@/lib/utils";
+import { replaceExtension } from "@/lib/utils";
 import { CompressionSettings as CompressionSettingsPanel } from "@/components/compression-settings";
-import { DownloadActions } from "@/components/download-actions";
 import { ImageDropzone } from "@/components/image-dropzone";
 import { ImageQueue } from "@/components/image-queue";
-import { ProgressBar } from "@/components/progress-bar";
-import { Card, CardContent } from "@/components/ui/card";
 
 const DEFAULT_SETTINGS: CompressionSettings = {
   maxWidth: 1920,
@@ -250,10 +247,6 @@ export function ImageCompressorApp() {
     };
   }, []);
 
-  const totalOriginal = images.reduce((sum, image) => sum + image.file.size, 0);
-  const totalCompressed = images.reduce((sum, image) => sum + (image.compressedBlob?.size ?? 0), 0);
-  const totalReduction = totalCompressed ? getReduction(totalOriginal, totalCompressed) : undefined;
-
   return (
     <main className="min-h-screen">
       <header className="border-b bg-card/80 backdrop-blur-xl">
@@ -312,60 +305,17 @@ export function ImageCompressorApp() {
               selectedId={selectedImage?.id}
               isProcessing={isProcessing}
               isDesktop={isDesktop}
+              progress={progress}
+              processedCount={processedCount}
               onSelect={setSelectedId}
               onRemove={removeImage}
+              onProcess={processBatch}
+              onClear={clearAll}
             />
           </div>
 
           <aside className="grid gap-4 lg:sticky lg:top-5">
             <CompressionSettingsPanel settings={settings} onChange={handleSettingsChange} disabled={isProcessing} />
-
-            <Card className="overflow-hidden border-primary/15 shadow-md shadow-primary/[0.04]">
-              <CardContent className="grid gap-4 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-bold">Resumo do lote</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {images.length ? `${images.length} imagem(ns) pronta(s)` : "Adicione imagens para começar"}
-                    </p>
-                  </div>
-                  <Settings2 className="h-4 w-4 text-muted-foreground" />
-                </div>
-
-                {images.length ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-md bg-muted/70 p-3">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Original</p>
-                      <p className="mt-1 text-sm font-bold">{formatBytes(totalOriginal)}</p>
-                    </div>
-                    <div className="rounded-md bg-primary/[0.07] p-3">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-primary">Resultado</p>
-                      <p className="mt-1 text-sm font-bold text-primary">
-                        {totalCompressed ? formatBytes(totalCompressed) : "Aguardando"}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-
-                {totalReduction !== undefined ? (
-                  <div className="flex items-center justify-between rounded-md bg-secondary/10 px-3 py-2 text-sm">
-                    <span className="text-muted-foreground">Economia total</span>
-                    <strong className="text-emerald-700">{totalReduction.toFixed(1)}%</strong>
-                  </div>
-                ) : null}
-
-                <DownloadActions
-                  images={images}
-                  isProcessing={isProcessing}
-                  isDesktop={isDesktop}
-                  onProcess={processBatch}
-                  onClear={clearAll}
-                />
-                {isProcessing ? (
-                  <ProgressBar value={progress} label={`${processedCount} de ${images.length} imagens processadas`} />
-                ) : null}
-              </CardContent>
-            </Card>
           </aside>
         </div>
       </div>

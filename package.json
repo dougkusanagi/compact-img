@@ -11,8 +11,8 @@
     "lint": "eslint .",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build",
-    "desktop:dist": "tauri build"
+    "desktop:build": "tauri build --bundles msi",
+    "desktop:dist": "pwsh -NoProfile -File scripts/build-windows-release.ps1"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.7",
