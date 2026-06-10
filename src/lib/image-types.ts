@@ -19,14 +19,21 @@ export type ImageDimensions = {
 export type QueueImage = {
   id: string;
   file: File;
+  sourcePath?: string;
   originalUrl: string;
   compressedUrl?: string;
   compressedBlob?: Blob;
   compressedName?: string;
+  savedPath?: string;
   originalDimensions?: ImageDimensions;
   finalDimensions?: ImageDimensions;
   status: ImageStatus;
   error?: string;
+};
+
+export type SelectedImage = {
+  file: File;
+  sourcePath?: string;
 };
 
 export type WorkerRequest = {

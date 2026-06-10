@@ -1,21 +1,24 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { LockKeyhole, Settings2, Sparkles } from "lucide-react";
 import type {
   CompressionSettings,
   QueueImage,
+  SelectedImage,
   WorkerRequest,
   WorkerResponse
 } from "@/lib/image-types";
 import { createImageId, isAcceptedImage, readImageDimensions } from "@/lib/image-utils";
+import { isDesktopApp, saveCompressedImage } from "@/lib/desktop";
 import { formatBytes, getReduction, replaceExtension } from "@/lib/utils";
 import { CompressionSettings as CompressionSettingsPanel } from "@/components/compression-settings";
 import { DownloadActions } from "@/components/download-actions";
 import { ImageDropzone } from "@/components/image-dropzone";
 import { ImageQueue } from "@/components/image-queue";
 import { ProgressBar } from "@/components/progress-bar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 const DEFAULT_SETTINGS: CompressionSettings = {
   maxWidth: 1920,
@@ -64,6 +67,7 @@ export function ImageCompressorApp() {
   const [invalidFiles, setInvalidFiles] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
   const imagesRef = useRef<QueueImage[]>([]);
 
   const handleSettingsChange = useCallback((newSettings: CompressionSettings) => {
@@ -72,6 +76,7 @@ export function ImageCompressorApp() {
   }, []);
 
   useEffect(() => {
+    setIsDesktop(isDesktopApp());
     const saved = localStorage.getItem("compact-img-settings");
     if (saved) {
       try {
@@ -89,17 +94,20 @@ export function ImageCompressorApp() {
 
   const progress = images.length ? (processedCount / images.length) * 100 : 0;
 
-  const addFiles = useCallback((files: File[]) => {
-    const validFiles = files.filter(isAcceptedImage);
-    const rejected = files.filter((file) => !isAcceptedImage(file)).map((file) => file.name);
+  const addFiles = useCallback((selectedImages: SelectedImage[]) => {
+    const validFiles = selectedImages.filter(({ file }) => isAcceptedImage(file));
+    const rejected = selectedImages
+      .filter(({ file }) => !isAcceptedImage(file))
+      .map(({ file }) => file.name);
 
     if (rejected.length) {
       setInvalidFiles(rejected);
     }
 
-    const nextImages: QueueImage[] = validFiles.map((file) => ({
+    const nextImages: QueueImage[] = validFiles.map(({ file, sourcePath }) => ({
       id: createImageId(file),
       file,
+      sourcePath,
       originalUrl: URL.createObjectURL(file),
       status: "pending"
     }));
@@ -168,6 +176,7 @@ export function ImageCompressorApp() {
           compressedUrl: undefined,
           compressedBlob: undefined,
           compressedName: undefined,
+          savedPath: undefined,
           finalDimensions: undefined,
           status: "pending",
           error: undefined
@@ -181,6 +190,18 @@ export function ImageCompressorApp() {
       );
 
       const result = await compressInWorker(image.file, image.id, settings);
+      const compressedName = replaceExtension(image.file.name, settings.outputFormat);
+      let savedPath: string | undefined;
+      let saveError: string | undefined;
+
+      if (result.blob && image.sourcePath && isDesktop) {
+        try {
+          savedPath = await saveCompressedImage(image.sourcePath, compressedName, result.blob);
+        } catch (error) {
+          saveError =
+            error instanceof Error ? error.message : String(error || "Nao foi possivel salvar a imagem compactada.");
+        }
+      }
 
       setImages((current) =>
         current.map((item) => {
@@ -188,11 +209,16 @@ export function ImageCompressorApp() {
             return item;
           }
 
-          if (result.error || !result.blob) {
+          if (result.error || !result.blob || saveError) {
             return {
               ...item,
+              compressedBlob: result.blob,
+              compressedUrl: result.blob ? URL.createObjectURL(result.blob) : undefined,
+              compressedName: result.blob ? compressedName : undefined,
+              originalDimensions: result.originalDimensions ?? item.originalDimensions,
+              finalDimensions: result.finalDimensions,
               status: "error",
-              error: result.error ?? "Nao foi possivel compactar esta imagem."
+              error: result.error ?? saveError ?? "Nao foi possivel compactar esta imagem."
             };
           }
 
@@ -200,7 +226,8 @@ export function ImageCompressorApp() {
             ...item,
             compressedBlob: result.blob,
             compressedUrl: URL.createObjectURL(result.blob),
-            compressedName: replaceExtension(item.file.name, settings.outputFormat),
+            compressedName,
+            savedPath,
             originalDimensions: result.originalDimensions ?? item.originalDimensions,
             finalDimensions: result.finalDimensions,
             status: "done",
@@ -212,7 +239,7 @@ export function ImageCompressorApp() {
     }
 
     setIsProcessing(false);
-  }, [images, isProcessing, settings]);
+  }, [images, isDesktop, isProcessing, settings]);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -229,68 +256,120 @@ export function ImageCompressorApp() {
   const totalReduction = totalCompressed ? getReduction(totalOriginal, totalCompressed) : undefined;
 
   return (
-    <main className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-6">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-normal">Compact Img</h1>
-            <p className="text-sm text-muted-foreground">Compactacao de imagens em lote, 100% local.</p>
+    <main className="min-h-screen">
+      <header className="border-b bg-card/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 lg:px-6">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/icon.png"
+              alt=""
+              width={40}
+              height={40}
+              priority
+              className="h-10 w-10 rounded-xl shadow-sm shadow-primary/25"
+            />
+            <div>
+              <h1 className="text-lg font-bold tracking-tight">Compact Img</h1>
+              <p className="hidden text-xs text-muted-foreground sm:block">Imagens menores, sem perder o controle.</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground">
-            <ShieldCheck className="h-4 w-4 text-secondary" />
-            Sem upload para servidor
+          <div className="flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            <LockKeyhole className="h-3.5 w-3.5 text-secondary" />
+            <span className="hidden sm:inline">Processamento 100% local</span>
+            <span className="sm:hidden">100% local</span>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto flex flex-col gap-5 px-4 py-5 lg:px-6 max-w-7xl">
-        {/* Row 1: ImageDropzone and CompressionSettings side-by-side on desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-          <div className="lg:col-span-2">
-            <ImageDropzone onFiles={addFiles} onInvalidFiles={setInvalidFiles} />
+      <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+        <div className="mb-6 animate-enter">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary">
+            <Sparkles className="h-4 w-4" />
+            Compactação simples e rápida
           </div>
-          <div>
-            <CompressionSettingsPanel settings={settings} onChange={handleSettingsChange} disabled={isProcessing} />
-          </div>
+          <h2 className="max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
+            Otimize várias imagens de uma vez.
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            Adicione os arquivos, ajuste como preferir e compacte. Todo o processo acontece no seu dispositivo.
+          </p>
         </div>
 
-        {invalidFiles.length ? (
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-            Arquivos ignorados: {invalidFiles.join(", ")}
-          </div>
-        ) : null}
-
-        {/* Row 2: Batch actions card */}
-        <Card className="w-full">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Acoes do lote</CardTitle>
-            <span className="text-sm text-muted-foreground">
-              {formatBytes(totalOriginal)}
-              {totalCompressed ? ` -> ${formatBytes(totalCompressed)}` : ""}
-              {totalReduction !== undefined ? ` (${totalReduction.toFixed(1)}% menor)` : ""}
-            </span>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <DownloadActions
-              images={images}
-              isProcessing={isProcessing}
-              onProcess={processBatch}
-              onClear={clearAll}
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="grid min-w-0 gap-5 animate-enter-delayed">
+            <ImageDropzone
+              onFiles={addFiles}
+              onInvalidFiles={setInvalidFiles}
+              isDesktop={isDesktop}
             />
-            {isProcessing ? (
-              <ProgressBar value={progress} label={`${processedCount} de ${images.length} imagens processadas`} />
-            ) : null}
-          </CardContent>
-        </Card>
 
-        {/* Row 3: ImageQueue */}
-        <ImageQueue
-          images={images}
-          selectedId={selectedImage?.id}
-          isProcessing={isProcessing}
-          onSelect={setSelectedId}
-          onRemove={removeImage}
-        />
+            {invalidFiles.length ? (
+              <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                <strong>Arquivos ignorados:</strong> {invalidFiles.join(", ")}
+              </div>
+            ) : null}
+
+            <ImageQueue
+              images={images}
+              selectedId={selectedImage?.id}
+              isProcessing={isProcessing}
+              isDesktop={isDesktop}
+              onSelect={setSelectedId}
+              onRemove={removeImage}
+            />
+          </div>
+
+          <aside className="grid gap-4 lg:sticky lg:top-5">
+            <CompressionSettingsPanel settings={settings} onChange={handleSettingsChange} disabled={isProcessing} />
+
+            <Card className="overflow-hidden border-primary/15 shadow-md shadow-primary/[0.04]">
+              <CardContent className="grid gap-4 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold">Resumo do lote</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {images.length ? `${images.length} imagem(ns) pronta(s)` : "Adicione imagens para começar"}
+                    </p>
+                  </div>
+                  <Settings2 className="h-4 w-4 text-muted-foreground" />
+                </div>
+
+                {images.length ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-md bg-muted/70 p-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Original</p>
+                      <p className="mt-1 text-sm font-bold">{formatBytes(totalOriginal)}</p>
+                    </div>
+                    <div className="rounded-md bg-primary/[0.07] p-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-primary">Resultado</p>
+                      <p className="mt-1 text-sm font-bold text-primary">
+                        {totalCompressed ? formatBytes(totalCompressed) : "Aguardando"}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
+                {totalReduction !== undefined ? (
+                  <div className="flex items-center justify-between rounded-md bg-secondary/10 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Economia total</span>
+                    <strong className="text-emerald-700">{totalReduction.toFixed(1)}%</strong>
+                  </div>
+                ) : null}
+
+                <DownloadActions
+                  images={images}
+                  isProcessing={isProcessing}
+                  isDesktop={isDesktop}
+                  onProcess={processBatch}
+                  onClear={clearAll}
+                />
+                {isProcessing ? (
+                  <ProgressBar value={progress} label={`${processedCount} de ${images.length} imagens processadas`} />
+                ) : null}
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
       </div>
     </main>
   );

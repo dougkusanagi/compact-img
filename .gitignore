@@ -13,6 +13,7 @@ out/
 # production
 build/
 dist/
+src-tauri/target/
 
 # misc
 .DS_Store
