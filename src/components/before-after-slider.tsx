@@ -24,10 +24,20 @@ export function BeforeAfterSlider({ beforeUrl, afterUrl, alt }: BeforeAfterSlide
     <div className="grid gap-3">
       <div className="relative aspect-video overflow-hidden rounded-lg border bg-muted shadow-inner">
         <img src={beforeUrl} alt={`${alt} original`} className="absolute inset-0 h-full w-full object-contain" />
-        <div className="absolute inset-0 overflow-hidden" style={{ width: `${position}%` }}>
-          <img src={afterUrl} alt={`${alt} compactada`} className="h-full w-full object-contain" />
+        <div
+          className="absolute inset-0"
+          style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
+        >
+          <img
+            src={afterUrl}
+            alt={`${alt} compactada`}
+            className="absolute inset-0 h-full w-full object-contain"
+          />
         </div>
-        <div className="absolute inset-y-0 w-0.5 bg-white shadow-md" style={{ left: `${position}%` }}>
+        <div
+          className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-white shadow-md"
+          style={{ left: `${position}%` }}
+        >
           <div className="absolute left-1/2 top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-primary text-[10px] font-bold text-white shadow-lg">
             ↔
           </div>
@@ -39,7 +49,14 @@ export function BeforeAfterSlider({ beforeUrl, afterUrl, alt }: BeforeAfterSlide
           Antes
         </div>
       </div>
-      <Slider min={0} max={100} step={1} value={[position]} onValueChange={([value]) => setPosition(value)} />
+      <Slider
+        min={0}
+        max={100}
+        step={1}
+        value={[position]}
+        onValueChange={([value]) => setPosition(value)}
+        aria-label="Proporção visível entre a imagem depois e antes"
+      />
     </div>
   );
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LockKeyhole, Settings2, Sparkles } from "lucide-react";
 import type {
@@ -260,12 +259,11 @@ export function ImageCompressorApp() {
       <header className="border-b bg-card/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 lg:px-6">
           <div className="flex items-center gap-3">
-            <Image
-              src="/icon.png"
+            <img
+              src="./icon.png"
               alt=""
               width={40}
               height={40}
-              priority
               className="h-10 w-10 rounded-xl shadow-sm shadow-primary/25"
             />
             <div>
