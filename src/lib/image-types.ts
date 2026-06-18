@@ -16,6 +16,8 @@ export type ImageDimensions = {
   height: number;
 };
 
+export type DownloadMode = "same-folder" | "choose-location";
+
 export type QueueImage = {
   id: string;
   file: File;
@@ -29,6 +31,7 @@ export type QueueImage = {
   finalDimensions?: ImageDimensions;
   status: ImageStatus;
   error?: string;
+  downloadError?: string;
 };
 
 export type SelectedImage = {

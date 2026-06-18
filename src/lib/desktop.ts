@@ -1,5 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import type { SelectedImage } from "@/lib/image-types";
 
 const MIME_BY_EXTENSION: Record<string, string> = {
@@ -60,13 +60,45 @@ export async function selectDesktopImages() {
   return loadImagesFromPaths(Array.isArray(selected) ? selected : [selected]);
 }
 
-export async function saveCompressedImage(sourcePath: string, fileName: string, blob: Blob) {
+type SaveCompressedImageInput = {
+  blob: Blob;
+  fileName: string;
+  sourcePath?: string;
+  destinationPath?: string;
+};
+
+export function buildSiblingDestinationPath(sourcePath: string, fileName: string) {
+  const segments = sourcePath.split(/[\\/]/);
+  segments.pop();
+  return [...segments, fileName].join("\\");
+}
+
+export async function chooseSavePath(sourcePath: string | undefined, fileName: string) {
+  return save({
+    title: "Salvar imagem compactada",
+    filters: [
+      {
+        name: "Imagens",
+        extensions: [fileName.split(".").pop()?.toLowerCase() ?? "webp"]
+      }
+    ],
+    defaultPath: sourcePath ? buildSiblingDestinationPath(sourcePath, fileName) : fileName
+  });
+}
+
+export async function saveCompressedImage({
+  blob,
+  fileName,
+  sourcePath,
+  destinationPath
+}: SaveCompressedImageInput) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
 
   return invoke<string>("save_compressed_image", bytes, {
     headers: {
-      "x-source-path": encodeURIComponent(sourcePath),
-      "x-file-name": encodeURIComponent(fileName)
+      "x-file-name": encodeURIComponent(fileName),
+      ...(sourcePath ? { "x-source-path": encodeURIComponent(sourcePath) } : {}),
+      ...(destinationPath ? { "x-destination-path": encodeURIComponent(destinationPath) } : {})
     }
   });
 }

@@ -44,15 +44,48 @@ fn write_compressed_image(
     Ok(destination)
 }
 
+fn write_compressed_image_to_path(
+    destination_path: &Path,
+    file_name: &str,
+    contents: &[u8],
+) -> Result<PathBuf, String> {
+    let requested_name = Path::new(file_name);
+
+    if requested_name.file_name() != Some(OsStr::new(file_name)) {
+        return Err("Nome de arquivo de saida invalido.".into());
+    }
+
+    if destination_path.file_name() != Some(OsStr::new(file_name)) {
+        return Err("Caminho de destino invalido.".into());
+    }
+
+    let parent = destination_path
+        .parent()
+        .ok_or_else(|| "O caminho de destino nao possui uma pasta valida.".to_string())?;
+
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    fs::write(destination_path, contents).map_err(|error| error.to_string())?;
+    Ok(destination_path.to_path_buf())
+}
+
 #[tauri::command]
 fn save_compressed_image(request: Request<'_>) -> Result<String, String> {
-    let source_path = PathBuf::from(decoded_header(&request, "x-source-path")?);
     let file_name = decoded_header(&request, "x-file-name")?;
     let InvokeBody::Raw(contents) = request.body() else {
         return Err("Os dados da imagem compactada sao invalidos.".into());
     };
 
-    let destination = write_compressed_image(&source_path, &file_name, contents)?;
+    let destination = match request.headers().get("x-destination-path") {
+        Some(_) => {
+            let destination_path = PathBuf::from(decoded_header(&request, "x-destination-path")?);
+            write_compressed_image_to_path(&destination_path, &file_name, contents)?
+        }
+        None => {
+            let source_path = PathBuf::from(decoded_header(&request, "x-source-path")?);
+            write_compressed_image(&source_path, &file_name, contents)?
+        }
+    };
+
     Ok(destination.to_string_lossy().into_owned())
 }
 
@@ -67,7 +100,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::write_compressed_image;
+    use super::{write_compressed_image, write_compressed_image_to_path};
     use std::{
         fs,
         time::{SystemTime, UNIX_EPOCH},
@@ -105,5 +138,21 @@ mod tests {
         let result = write_compressed_image(&source, "../foto.webp", b"imagem");
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn saves_to_a_custom_destination_path() {
+        let directory = temporary_directory();
+        let destination = directory.join("saida").join("foto-compactado.webp");
+
+        let saved = write_compressed_image_to_path(&destination, "foto-compactado.webp", b"imagem")
+            .expect("nao foi possivel salvar a imagem em caminho customizado");
+
+        assert_eq!(saved, destination);
+        assert_eq!(
+            fs::read(destination).expect("arquivo de saida ausente"),
+            b"imagem"
+        );
+        fs::remove_dir_all(directory).expect("nao foi possivel limpar a pasta de teste");
     }
 }

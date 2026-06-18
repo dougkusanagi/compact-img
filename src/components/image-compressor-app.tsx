@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LockKeyhole, Sparkles } from "lucide-react";
 import type {
   CompressionSettings,
+  DownloadMode,
   QueueImage,
   SelectedImage,
   WorkerRequest,
   WorkerResponse
 } from "@/lib/image-types";
 import { createImageId, isAcceptedImage, readImageDimensions } from "@/lib/image-utils";
-import { isDesktopApp, saveCompressedImage } from "@/lib/desktop";
+import { chooseSavePath, isDesktopApp, saveCompressedImage } from "@/lib/desktop";
 import { replaceExtension } from "@/lib/utils";
 import { CompressionSettings as CompressionSettingsPanel } from "@/components/compression-settings";
 import { ImageDropzone } from "@/components/image-dropzone";
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS: CompressionSettings = {
   keepAspectRatio: true,
   stripMetadata: true
 };
+const DEFAULT_DOWNLOAD_MODE: DownloadMode = "same-folder";
 
 function compressInWorker(file: File, id: string, settings: CompressionSettings) {
   return new Promise<WorkerResponse>((resolve) => {
@@ -64,6 +66,7 @@ export function ImageCompressorApp() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [downloadMode, setDownloadMode] = useState<DownloadMode>(DEFAULT_DOWNLOAD_MODE);
   const imagesRef = useRef<QueueImage[]>([]);
 
   const handleSettingsChange = useCallback((newSettings: CompressionSettings) => {
@@ -81,6 +84,16 @@ export function ImageCompressorApp() {
         console.error("Erro ao carregar configuracoes:", e);
       }
     }
+
+    const savedDownloadMode = localStorage.getItem("compact-img-download-mode");
+    if (savedDownloadMode === "same-folder" || savedDownloadMode === "choose-location") {
+      setDownloadMode(savedDownloadMode);
+    }
+  }, []);
+
+  const handleDownloadModeChange = useCallback((mode: DownloadMode) => {
+    setDownloadMode(mode);
+    localStorage.setItem("compact-img-download-mode", mode);
   }, []);
 
   const selectedImage = useMemo(
@@ -174,6 +187,7 @@ export function ImageCompressorApp() {
           compressedName: undefined,
           savedPath: undefined,
           finalDimensions: undefined,
+          downloadError: undefined,
           status: "pending",
           error: undefined
         };
@@ -187,17 +201,6 @@ export function ImageCompressorApp() {
 
       const result = await compressInWorker(image.file, image.id, settings);
       const compressedName = replaceExtension(image.file.name, settings.outputFormat);
-      let savedPath: string | undefined;
-      let saveError: string | undefined;
-
-      if (result.blob && image.sourcePath && isDesktop) {
-        try {
-          savedPath = await saveCompressedImage(image.sourcePath, compressedName, result.blob);
-        } catch (error) {
-          saveError =
-            error instanceof Error ? error.message : String(error || "Nao foi possivel salvar a imagem compactada.");
-        }
-      }
 
       setImages((current) =>
         current.map((item) => {
@@ -205,7 +208,7 @@ export function ImageCompressorApp() {
             return item;
           }
 
-          if (result.error || !result.blob || saveError) {
+          if (result.error || !result.blob) {
             return {
               ...item,
               compressedBlob: result.blob,
@@ -214,7 +217,7 @@ export function ImageCompressorApp() {
               originalDimensions: result.originalDimensions ?? item.originalDimensions,
               finalDimensions: result.finalDimensions,
               status: "error",
-              error: result.error ?? saveError ?? "Nao foi possivel compactar esta imagem."
+              error: result.error ?? "Nao foi possivel compactar esta imagem."
             };
           }
 
@@ -223,11 +226,12 @@ export function ImageCompressorApp() {
             compressedBlob: result.blob,
             compressedUrl: URL.createObjectURL(result.blob),
             compressedName,
-            savedPath,
+            savedPath: undefined,
             originalDimensions: result.originalDimensions ?? item.originalDimensions,
             finalDimensions: result.finalDimensions,
             status: "done",
-            error: undefined
+            error: undefined,
+            downloadError: undefined
           };
         })
       );
@@ -235,7 +239,57 @@ export function ImageCompressorApp() {
     }
 
     setIsProcessing(false);
-  }, [images, isDesktop, isProcessing, settings]);
+  }, [images, isProcessing, settings]);
+
+  const downloadImage = useCallback(async (id: string) => {
+    const image = imagesRef.current.find((item) => item.id === id);
+    if (!image?.compressedBlob || !image.compressedName || !isDesktop) {
+      return;
+    }
+
+    try {
+      const mustChooseLocation = downloadMode === "choose-location" || !image.sourcePath;
+      const destinationPath = mustChooseLocation ? await chooseSavePath(image.sourcePath, image.compressedName) : undefined;
+
+      if (mustChooseLocation && !destinationPath) {
+        return;
+      }
+
+      const savedPath = await saveCompressedImage({
+        blob: image.compressedBlob,
+        fileName: image.compressedName,
+        sourcePath: image.sourcePath,
+        destinationPath: destinationPath ?? undefined
+      });
+
+      setImages((current) =>
+        current.map((item) =>
+          item.id === id
+            ? { ...item, savedPath, downloadError: undefined }
+            : item
+        )
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel baixar a imagem compactada.";
+      setImages((current) =>
+        current.map((item) =>
+          item.id === id
+            ? { ...item, downloadError: message }
+            : item
+        )
+      );
+    }
+  }, [downloadMode, isDesktop]);
+
+  const downloadAllDesktop = useCallback(async () => {
+    const readyImages = imagesRef.current.filter(
+      (image) => image.status === "done" && image.compressedBlob && image.compressedName
+    );
+
+    for (const image of readyImages) {
+      await downloadImage(image.id);
+    }
+  }, [downloadImage]);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -305,12 +359,16 @@ export function ImageCompressorApp() {
               selectedId={selectedImage?.id}
               isProcessing={isProcessing}
               isDesktop={isDesktop}
+              downloadMode={downloadMode}
               progress={progress}
               processedCount={processedCount}
               onSelect={setSelectedId}
               onRemove={removeImage}
               onProcess={processBatch}
               onClear={clearAll}
+              onDownload={downloadImage}
+              onDownloadAllDesktop={downloadAllDesktop}
+              onDownloadModeChange={handleDownloadModeChange}
             />
           </div>
 

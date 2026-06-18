@@ -161,7 +161,7 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop }: ImageDropz
         {isImporting
           ? "Preparando os arquivos para exibir na lista. Isso pode levar alguns segundos."
           : isDesktop
-          ? "Os arquivos compactados serão salvos automaticamente na pasta original."
+          ? "Compacte localmente, compare o resultado e baixe depois para a mesma pasta ou para outro local."
           : "O processamento acontece no seu dispositivo. Nenhuma imagem é enviada."}
       </p>
       <button
