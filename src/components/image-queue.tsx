@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   AlertCircle,
+  ArrowRight,
   CheckCircle2,
   ChevronDown,
   Clock3,
@@ -53,8 +54,8 @@ const STATUS_CONFIG: Record<
     icon: LoaderCircle
   },
   done: {
-    label: "Concluida",
-    className: "bg-emerald-50 text-emerald-700",
+    label: "Concluída",
+    className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
     icon: CheckCircle2
   },
   error: {
@@ -63,14 +64,6 @@ const STATUS_CONFIG: Record<
     icon: AlertCircle
   }
 };
-
-function formatDimensionDelta(value: number) {
-  if (value === 0) {
-    return "0 px";
-  }
-
-  return `${value > 0 ? "+" : ""}${value}px`;
-}
 
 type MetricBadgeProps = {
   label: string;
@@ -82,19 +75,21 @@ function MetricBadge({ label, value, tone = "default" }: MetricBadgeProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border px-3 py-2",
-        tone === "success" ? "border-emerald-200 bg-emerald-50" : "bg-muted/35"
+        "rounded-xl border px-3 py-2 transition-all duration-300",
+        tone === "success"
+          ? "border-emerald-500/20 bg-emerald-500/[0.03] shadow-[0_2px_8px_rgba(16,185,129,0.03)]"
+          : "border-border/50 bg-muted/20"
       )}
     >
       <p
         className={cn(
-          "text-[11px] font-medium uppercase tracking-[0.12em]",
-          tone === "success" ? "text-emerald-700" : "text-muted-foreground"
+          "text-[10px] font-semibold uppercase tracking-wider",
+          tone === "success" ? "text-emerald-600" : "text-muted-foreground"
         )}
       >
         {label}
       </p>
-      <p className="mt-1 font-semibold text-foreground">{value}</p>
+      <p className="mt-1 text-sm font-bold text-foreground sm:text-base">{value}</p>
     </div>
   );
 }
@@ -123,43 +118,45 @@ export function ImageQueue({
     .filter((value): value is number => value !== undefined);
 
   return (
-    <Card className="overflow-hidden border-border/70 shadow-[0_18px_45px_hsl(222_45%_13%/0.06)]">
-      <CardHeader className="space-y-4 border-b bg-[linear-gradient(180deg,hsl(var(--card))_0%,hsl(var(--muted)/0.38)_100%)]">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner shadow-primary/10">
-              <ScanSearch className="h-5 w-5" />
+    <Card className="overflow-hidden border-border/60 shadow-[0_12px_38px_rgba(0,0,0,0.04)]">
+      {images.length > 0 && (
+        <CardHeader className="space-y-4 border-b bg-card p-5">
+          {/* Linha 1: Título, Subtítulo e Badges do Lote */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary shadow-sm flex-shrink-0">
+                <ScanSearch className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold text-foreground">Fila de compactação</CardTitle>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Acompanhe e compare os ganhos do lote antes de baixar.
+                </p>
+              </div>
             </div>
-            <div>
-              <CardTitle>Suas imagens</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Acompanhe o lote, compare ganhos e baixe so quando fizer sentido.
-              </p>
+            <div className="flex flex-wrap items-center gap-1.5 sm:self-start">
+              <span className="rounded-full bg-muted/70 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                {images.length} {images.length === 1 ? "item" : "itens"}
+              </span>
+              {completedCount > 0 && (
+                <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  {completedCount} concluídas
+                </span>
+              )}
+              {errorCount > 0 && (
+                <span className="rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive">
+                  {errorCount} com erro
+                </span>
+              )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border bg-background/80 px-3 py-1 text-xs font-semibold text-foreground">
-              {images.length} {images.length === 1 ? "item" : "itens"}
-            </span>
-            {completedCount > 0 ? (
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                {completedCount} concluidas
-              </span>
-            ) : null}
-            {errorCount > 0 ? (
-              <span className="rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
-                {errorCount} com erro
-              </span>
-            ) : null}
-          </div>
-        </div>
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-          <div className="grid gap-2 sm:grid-cols-3">
+          {/* Linha 2: Métricas Gerais (Largura Total) */}
+          <div className="grid gap-3 grid-cols-3 border-t border-border/40 pt-4">
             <MetricBadge label="Na fila" value={String(images.length)} />
-            <MetricBadge label="Concluidas" value={String(completedCount)} />
+            <MetricBadge label="Concluídas" value={String(completedCount)} />
             <MetricBadge
-              label="Reducao media"
+              label="Redução Média"
               value={
                 averageReduction.length
                   ? formatPercent(averageReduction.reduce((sum, value) => sum + value, 0) / averageReduction.length)
@@ -168,169 +165,193 @@ export function ImageQueue({
               tone="success"
             />
           </div>
-          <DownloadActions
-            images={images}
-            isProcessing={isProcessing}
-            isDesktop={isDesktop}
-            downloadMode={downloadMode}
-            onProcess={onProcess}
-            onClear={onClear}
-            onDownloadAllDesktop={onDownloadAllDesktop}
-            onDownloadModeChange={onDownloadModeChange}
-            compact
-          />
-        </div>
-      </CardHeader>
 
-      {isProcessing ? (
-        <div className="border-b bg-muted/30 px-6 py-3">
+          {/* Linha 3: Controles e Ações em Lote */}
+          <div className="border-t border-border/40 pt-3 flex w-full">
+            <DownloadActions
+              images={images}
+              isProcessing={isProcessing}
+              isDesktop={isDesktop}
+              downloadMode={downloadMode}
+              onProcess={onProcess}
+              onClear={onClear}
+              onDownloadAllDesktop={onDownloadAllDesktop}
+              onDownloadModeChange={onDownloadModeChange}
+              compact
+            />
+          </div>
+        </CardHeader>
+      )}
+
+      {isProcessing && (
+        <div className="border-b bg-muted/20 px-6 py-3">
           <ProgressBar value={progress} label={`${processedCount} de ${images.length} imagens processadas`} />
         </div>
-      ) : null}
+      )}
 
       <CardContent className="p-0">
         {images.length === 0 ? (
-          <div className="flex min-h-52 flex-col items-center justify-center p-8 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-              <FolderDown className="h-6 w-6" />
+          <div className="flex min-h-60 flex-col items-center justify-center p-8 text-center bg-card">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground/85">
+              <FolderDown className="h-5 w-5" />
             </div>
-            <p className="text-sm font-semibold">Nenhuma imagem adicionada</p>
-            <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-              Assim que voce enviar arquivos, este painel mostra status, comparativos e downloads por imagem.
+            <p className="text-sm font-semibold text-foreground">Nenhuma imagem adicionada</p>
+            <p className="mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground">
+              Adicione arquivos acima para acompanhar o status, comparar visualmente e baixar os resultados.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-border/70">
+          <div className="divide-y divide-border/40 bg-card">
             {images.map((image) => {
               const reduction = getReduction(image.file.size, image.compressedBlob?.size);
               const isPreviewOpen = previewId === image.id;
               const status = STATUS_CONFIG[image.status];
               const StatusIcon = status.icon;
               const hasCompressed = Boolean(image.compressedBlob && image.compressedName);
-              const widthDiff = image.originalDimensions && image.finalDimensions
-                ? image.finalDimensions.width - image.originalDimensions.width
-                : undefined;
-              const heightDiff = image.originalDimensions && image.finalDimensions
-                ? image.finalDimensions.height - image.originalDimensions.height
-                : undefined;
-              const sizeDiff = image.compressedBlob ? image.compressedBlob.size - image.file.size : undefined;
 
               return (
                 <article
                   key={image.id}
                   className={cn(
-                    "transition-all duration-200",
-                    selectedId === image.id ? "bg-primary/[0.03]" : "hover:bg-muted/20"
+                    "transition-all duration-200 border-l-2",
+                    selectedId === image.id
+                      ? "border-primary bg-primary/[0.015]"
+                      : "border-transparent hover:bg-muted/15"
                   )}
                 >
                   <div
-                    className="grid cursor-pointer gap-4 p-4 sm:grid-cols-[92px_minmax(0,1fr)] xl:grid-cols-[92px_minmax(0,1fr)_220px]"
+                    className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between cursor-pointer"
                     onClick={() => onSelect(image.id)}
                   >
-                    <div className="relative h-24 w-full overflow-hidden rounded-xl border bg-muted sm:w-[92px]">
-                      <img src={image.originalUrl} alt={image.file.name} className="h-full w-full object-cover" />
-                      {image.status === "done" ? (
-                        <div className="absolute bottom-2 right-2 rounded-full bg-emerald-500 p-1 text-white shadow">
-                          <CheckCircle2 className="h-3 w-3" />
-                        </div>
-                      ) : null}
-                    </div>
+                    {/* Bloco da esquerda: Thumbnail e informações */}
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      {/* Thumbnail com status overlay */}
+                      <div className="relative h-16 w-16 flex-shrink-0 rounded-xl overflow-hidden border bg-muted shadow-sm group">
+                        <img
+                          src={image.originalUrl}
+                          alt={image.file.name}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        {image.status === "done" && (
+                          <div className="absolute right-1 top-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm ring-1 ring-white">
+                            <CheckCircle2 className="h-3 w-3" />
+                          </div>
+                        )}
+                        {image.status === "processing" && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
+                            <LoaderCircle className="h-5 w-5 animate-spin text-white" />
+                          </div>
+                        )}
+                        {image.status === "error" && (
+                          <div className="absolute right-1 top-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-destructive text-white shadow-sm ring-1 ring-white">
+                            <AlertCircle className="h-3 w-3" />
+                          </div>
+                        )}
+                      </div>
 
-                    <div className="min-w-0 space-y-3">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-foreground" title={image.file.name}>
+                      {/* Nome do arquivo e métricas simplificadas */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-foreground tracking-tight" title={image.file.name}>
                             {image.file.name}
                           </p>
-                          <p className="mt-1 text-[11px] text-muted-foreground">
-                            Clique para selecionar e use comparar para abrir o preview.
-                          </p>
                         </div>
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                            status.className
+
+                        {/* Detalhes de tamanho e dimensões em fluxo linear */}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                          {image.status === "done" && image.compressedBlob ? (
+                            <>
+                              <span className="font-medium">{formatBytes(image.file.size)}</span>
+                              <ArrowRight className="h-3 w-3 text-muted-foreground/45" />
+                              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                {formatBytes(image.compressedBlob.size)}
+                              </span>
+                              {reduction !== undefined && (
+                                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  -{formatPercent(reduction)}
+                                </span>
+                              )}
+                              <span className="text-muted-foreground/30">•</span>
+                              <span className="text-muted-foreground/80">
+                                {image.originalDimensions && `${image.originalDimensions.width}×${image.originalDimensions.height}`}
+                                {image.originalDimensions && image.finalDimensions &&
+                                  (image.originalDimensions.width !== image.finalDimensions.width ||
+                                    image.originalDimensions.height !== image.finalDimensions.height) && (
+                                    <>
+                                      {" ➔ "}
+                                      <span className="font-medium text-foreground/85">
+                                        {image.finalDimensions.width}×{image.finalDimensions.height}px
+                                      </span>
+                                    </>
+                                  )}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span>{formatBytes(image.file.size)}</span>
+                              {image.originalDimensions && (
+                                <>
+                                  <span className="text-muted-foreground/30">•</span>
+                                  <span>{image.originalDimensions.width}×{image.originalDimensions.height}px</span>
+                                </>
+                              )}
+                              <span className="text-muted-foreground/30">•</span>
+                              <span className={cn(
+                                "inline-flex items-center gap-1 font-medium",
+                                image.status === "processing" && "text-primary",
+                                image.status === "error" && "text-destructive",
+                                image.status === "pending" && "text-muted-foreground"
+                              )}>
+                                {image.status === "processing" && <LoaderCircle className="h-3 w-3 animate-spin" />}
+                                {status.label}
+                              </span>
+                            </>
                           )}
-                        >
-                          <StatusIcon className={cn("h-3 w-3", image.status === "processing" && "animate-spin")} />
-                          {status.label}
-                        </span>
-                      </div>
+                        </div>
 
-                      <div className="grid gap-2 text-xs sm:grid-cols-2 2xl:grid-cols-4">
-                        <MetricBadge label="Original" value={formatBytes(image.file.size)} />
-                        <MetricBadge
-                          label="Dimensoes"
-                          value={
-                            image.originalDimensions
-                              ? `${image.originalDimensions.width} × ${image.originalDimensions.height}px`
-                              : "Lendo dimensoes..."
-                          }
-                        />
-                        {image.compressedBlob ? (
-                          <MetricBadge label="Compactada" value={formatBytes(image.compressedBlob.size)} tone="success" />
-                        ) : null}
-                        {image.finalDimensions ? (
-                          <MetricBadge
-                            label="Dimensoes finais"
-                            value={`${image.finalDimensions.width} × ${image.finalDimensions.height}px`}
-                            tone="success"
-                          />
-                        ) : null}
-                        {sizeDiff !== undefined ? (
-                          <MetricBadge
-                            label="Diferenca"
-                            value={`${sizeDiff < 0 ? "-" : "+"}${formatBytes(Math.abs(sizeDiff))}`}
-                            tone="success"
-                          />
-                        ) : null}
-                        {reduction !== undefined ? (
-                          <MetricBadge label="Reducao" value={formatPercent(reduction)} tone="success" />
-                        ) : null}
-                        {widthDiff !== undefined ? (
-                          <MetricBadge label="Largura" value={formatDimensionDelta(widthDiff)} />
-                        ) : null}
-                        {heightDiff !== undefined ? (
-                          <MetricBadge label="Altura" value={formatDimensionDelta(heightDiff)} />
-                        ) : null}
-                      </div>
+                        {/* Notificações de erro ou caminho de salvamento inline */}
+                        {(image.error || image.downloadError) && (
+                          <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive">
+                            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="font-medium">{image.error || image.downloadError}</span>
+                          </div>
+                        )}
 
-                      {image.error ? (
-                        <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                          {image.error}
-                        </div>
-                      ) : null}
-                      {image.downloadError ? (
-                        <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                          {image.downloadError}
-                        </div>
-                      ) : null}
-                      {image.savedPath ? (
-                        <div className="rounded-xl border bg-muted/25 px-3 py-2 text-xs text-muted-foreground" title={image.savedPath}>
-                          Baixada em: {image.savedPath}
-                        </div>
-                      ) : null}
+                        {image.savedPath && (
+                          <p className="mt-1.5 text-[11px] text-muted-foreground flex items-center gap-1" title={image.savedPath}>
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                            <span>Salvo em: <span className="font-medium text-foreground">{image.savedPath}</span></span>
+                          </p>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 xl:flex-col xl:items-stretch">
+                    {/* Bloco da direita: Ações de controle */}
+                    <div className="flex items-center justify-end gap-1.5 flex-shrink-0 self-end sm:self-center">
                       <Button
-                        variant={isPreviewOpen ? "secondary" : "outline"}
+                        variant={isPreviewOpen ? "secondary" : "ghost"}
                         size="sm"
-                        className="xl:justify-between"
+                        className={cn(
+                          "h-8 gap-1 rounded-lg px-2.5 text-xs font-medium transition-colors",
+                          isPreviewOpen
+                            ? "bg-secondary text-secondary-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
                         onClick={(event) => {
                           event.stopPropagation();
                           setPreviewId(isPreviewOpen ? null : image.id);
                         }}
-                        aria-label="Visualizar comparacao"
+                        aria-label="Visualizar comparação"
                       >
-                        <span>Comparar</span>
-                        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isPreviewOpen && "rotate-180")} />
+                        <ScanSearch className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Comparar</span>
                       </Button>
+
                       <Button
                         variant="outline"
                         size="sm"
                         disabled={!hasCompressed}
-                        className="xl:justify-between"
+                        className="h-8 gap-1 rounded-lg px-2.5 text-xs font-semibold shadow-sm border-emerald-500/20 text-emerald-600 hover:bg-emerald-500/5 hover:text-emerald-700 disabled:bg-muted/50 disabled:text-muted-foreground/50 disabled:border-transparent"
                         onClick={(event) => {
                           event.stopPropagation();
                           if (isDesktop) {
@@ -344,19 +365,15 @@ export function ImageQueue({
                         }}
                         aria-label="Baixar imagem"
                       >
-                        <Download className="h-4 w-4" />
-                        <span>Baixar</span>
+                        <Download className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Baixar</span>
                       </Button>
-                      {!isDesktop ? null : (
-                        <span className="hidden rounded-lg bg-muted/45 px-2 py-1 text-center text-[11px] text-muted-foreground xl:inline">
-                          {downloadMode === "same-folder" ? "Mesma pasta" : "Escolher local"}
-                        </span>
-                      )}
+
                       <Button
                         variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-destructive xl:justify-between"
+                        size="icon"
                         disabled={isProcessing}
+                        className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                         onClick={(event) => {
                           event.stopPropagation();
                           onRemove(image.id);
@@ -366,13 +383,12 @@ export function ImageQueue({
                         }}
                         aria-label="Remover imagem"
                       >
-                        <Trash2 className="h-4 w-4" />
-                        <span>Remover</span>
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
 
-                  {isPreviewOpen ? (
+                  {isPreviewOpen && (
                     <div className="animate-in slide-in-from-top-2 border-t bg-[linear-gradient(180deg,hsl(var(--muted)/0.28)_0%,hsl(var(--background))_100%)] p-4 duration-300 sm:p-5">
                       <div className="mx-auto max-w-3xl">
                         <BeforeAfterSlider
@@ -384,7 +400,7 @@ export function ImageQueue({
                           <p className="text-xs text-muted-foreground">
                             {image.status === "done"
                               ? "Arraste o controle para comparar o original e o resultado."
-                              : "Compacte a imagem para visualizar a comparacao."}
+                              : "Compacte a imagem para visualizar a comparação."}
                           </p>
                           {image.compressedBlob && image.compressedName ? (
                             <Button
@@ -406,7 +422,7 @@ export function ImageQueue({
                         </div>
                       </div>
                     </div>
-                  ) : null}
+                  )}
                 </article>
               );
             })}

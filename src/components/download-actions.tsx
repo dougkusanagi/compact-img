@@ -35,70 +35,78 @@ export function DownloadActions({
   const hasProcessed = images.some((image) => image.status === "done" || image.status === "error");
 
   return (
-    <div className={cn("grid gap-2", compact && "flex flex-wrap justify-end")}>
+    <div className={cn("grid gap-2", compact && "flex flex-wrap items-end justify-between gap-x-3 gap-y-2 w-full")}>
       {isDesktop ? (
-        <Select value={downloadMode} onValueChange={(value) => onDownloadModeChange(value as DownloadMode)}>
-          <SelectTrigger className={cn("min-w-52", compact && "h-9 w-auto")} disabled={isProcessing}>
-            <div className="flex items-center gap-2">
-              <FolderOpen className="h-4 w-4" />
-              <SelectValue placeholder="Destino do download" />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="same-folder">Baixar na mesma pasta</SelectItem>
-            <SelectItem value="choose-location">Escolher local ao baixar</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col gap-1 flex-1 min-w-[160px] max-w-[280px]">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 pl-0.5">
+            Destino do download
+          </label>
+          <Select value={downloadMode} onValueChange={(value) => onDownloadModeChange(value as DownloadMode)}>
+            <SelectTrigger className={cn("w-full", compact && "h-9")} disabled={isProcessing}>
+              <div className="flex items-center gap-2">
+                <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="Destino" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="same-folder">Mesma pasta</SelectItem>
+              <SelectItem value="choose-location">Escolher local</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       ) : null}
-      <Button className={cn(!compact && "w-full")} size={compact ? "sm" : "default"} disabled={!hasImages || isProcessing} onClick={onProcess}>
-        {hasProcessed ? <RotateCcw className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-        {hasProcessed ? "Reprocessar lote" : "Compactar lote"}
-      </Button>
-      {isDesktop ? (
-        <Button
-          variant="outline"
-          className={cn(!compact && "w-full")}
-          size={compact ? "sm" : "default"}
-          disabled={!hasCompressed || isProcessing}
-          onClick={onDownloadAllDesktop}
-        >
-          <Download className="h-4 w-4" />
-          Baixar todas
+
+      <div className="flex flex-wrap items-center gap-2 ml-auto">
+        <Button className={cn(!compact && "w-full")} size={compact ? "sm" : "default"} disabled={!hasImages || isProcessing} onClick={onProcess}>
+          {hasProcessed ? <RotateCcw className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          {hasProcessed ? "Reprocessar" : "Compactar"}
         </Button>
-      ) : (
-        <>
+        {isDesktop ? (
           <Button
             variant="outline"
             className={cn(!compact && "w-full")}
             size={compact ? "sm" : "default"}
             disabled={!hasCompressed || isProcessing}
-            onClick={() => downloadImagesIndividual(images)}
+            onClick={onDownloadAllDesktop}
           >
             <Download className="h-4 w-4" />
-            Baixar individualmente
+            Baixar todas
           </Button>
-          <Button
-            variant="outline"
-            className={cn(!compact && "w-full")}
-            size={compact ? "sm" : "default"}
-            disabled={!hasCompressed || isProcessing}
-            onClick={() => downloadImagesZip(images)}
-          >
-            <Download className="h-4 w-4" />
-            Baixar ZIP
-          </Button>
-        </>
-      )}
-      <Button
-        className={cn("text-muted-foreground", !compact && "w-full")}
-        variant="ghost"
-        size={compact ? "sm" : "default"}
-        disabled={!hasImages || isProcessing}
-        onClick={onClear}
-      >
-        <Trash2 className="h-4 w-4" />
-        Limpar tudo
-      </Button>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              className={cn(!compact && "w-full")}
+              size={compact ? "sm" : "default"}
+              disabled={!hasCompressed || isProcessing}
+              onClick={() => downloadImagesIndividual(images)}
+            >
+              <Download className="h-4 w-4" />
+              Baixar individual
+            </Button>
+            <Button
+              variant="outline"
+              className={cn(!compact && "w-full")}
+              size={compact ? "sm" : "default"}
+              disabled={!hasCompressed || isProcessing}
+              onClick={() => downloadImagesZip(images)}
+            >
+              <Download className="h-4 w-4" />
+              Baixar ZIP
+            </Button>
+          </>
+        )}
+        <Button
+          className={cn("text-muted-foreground", !compact && "w-full")}
+          variant="ghost"
+          size={compact ? "sm" : "default"}
+          disabled={!hasImages || isProcessing}
+          onClick={onClear}
+        >
+          <Trash2 className="h-4 w-4" />
+          Limpar tudo
+        </Button>
+      </div>
     </div>
   );
 }
