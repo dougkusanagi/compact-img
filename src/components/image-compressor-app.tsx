@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { LockKeyhole, Sparkles } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
 import type {
   CompressionSettings,
   DownloadMode,
@@ -453,19 +453,6 @@ export function ImageCompressorApp() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
-        <div className="mb-6 animate-enter">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary">
-            <Sparkles className="h-4 w-4" />
-            Compactação simples e rápida
-          </div>
-          <h2 className="max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
-            Otimize várias imagens de uma vez.
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Adicione os arquivos, ajuste como preferir e compacte. Todo o processo acontece no seu dispositivo.
-          </p>
-        </div>
-
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="grid min-w-0 gap-5 animate-enter-delayed">
             <ImageDropzone

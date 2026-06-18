@@ -55,9 +55,3 @@ export type WorkerResponse = {
   finalDimensions?: ImageDimensions;
   error?: string;
 };
-
-export type NativeCompressionResponse = {
-  contents: number[];
-  originalDimensions: ImageDimensions;
-  finalDimensions: ImageDimensions;
-};

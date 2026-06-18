@@ -1,6 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import type { CompressionSettings, NativeCompressionResponse, WorkerResponse, SelectedImage } from "@/lib/image-types";
+import type { CompressionSettings, WorkerResponse, SelectedImage } from "@/lib/image-types";
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   avif: "image/avif",
@@ -73,6 +73,36 @@ type NativeJpegCompressionInput = {
   settings: CompressionSettings;
 };
 
+function parseNativeJpegCompressionPayload(payload: ArrayBuffer) {
+  const bytes = new Uint8Array(payload);
+  const headerEnd = bytes.indexOf(10);
+
+  if (headerEnd <= 0) {
+    throw new Error("Resposta invalida da compressao nativa.");
+  }
+
+  const header = new TextDecoder().decode(bytes.subarray(0, headerEnd));
+  const [originalWidth, originalHeight, finalWidth, finalHeight] = header
+    .split(",")
+    .map((value) => Number.parseInt(value, 10));
+
+  if ([originalWidth, originalHeight, finalWidth, finalHeight].some((value) => !Number.isFinite(value) || value <= 0)) {
+    throw new Error("Dimensoes invalidas na resposta da compressao nativa.");
+  }
+
+  return {
+    contents: bytes.subarray(headerEnd + 1),
+    originalDimensions: {
+      width: originalWidth,
+      height: originalHeight
+    },
+    finalDimensions: {
+      width: finalWidth,
+      height: finalHeight
+    }
+  };
+}
+
 export function buildSiblingDestinationPath(sourcePath: string, fileName: string) {
   const segments = sourcePath.split(/[\\/]/);
   segments.pop();
@@ -131,14 +161,15 @@ export async function compressNativeJpeg({
   sourcePath,
   settings
 }: NativeJpegCompressionInput): Promise<WorkerResponse> {
-  const result = await invoke<NativeCompressionResponse>("compress_jpeg_image", {
+  const payload = await invoke<ArrayBuffer>("compress_jpeg_image", {
     sourcePath,
     settings
   });
+  const result = parseNativeJpegCompressionPayload(payload);
 
   return {
     id,
-    blob: new Blob([new Uint8Array(result.contents)], { type: "image/jpeg" }),
+    blob: new Blob([result.contents], { type: "image/jpeg" }),
     originalDimensions: result.originalDimensions,
     finalDimensions: result.finalDimensions
   };

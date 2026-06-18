@@ -16,6 +16,8 @@ type DownloadActionsProps = {
   onClear: () => void;
   onDownloadAllDesktop: () => void | Promise<void>;
   onDownloadModeChange: (mode: DownloadMode) => void;
+  hasCompressed?: boolean;
+  hasProcessed?: boolean;
   compact?: boolean;
 };
 
@@ -28,11 +30,13 @@ export function DownloadActions({
   onClear,
   onDownloadAllDesktop,
   onDownloadModeChange,
+  hasCompressed: hasCompressedProp,
+  hasProcessed: hasProcessedProp,
   compact = false
 }: DownloadActionsProps) {
   const hasImages = images.length > 0;
-  const hasCompressed = images.some((image) => image.compressedBlob && image.status === "done");
-  const hasProcessed = images.some((image) => image.status === "done" || image.status === "error");
+  const hasCompressed = hasCompressedProp ?? images.some((image) => image.compressedBlob && image.status === "done");
+  const hasProcessed = hasProcessedProp ?? images.some((image) => image.status === "done" || image.status === "error");
 
   return (
     <div className={cn("grid gap-2", compact && "flex flex-wrap items-end justify-between gap-x-3 gap-y-2 w-full")}>

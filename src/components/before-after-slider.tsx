@@ -15,7 +15,7 @@ export function BeforeAfterSlider({ beforeUrl, afterUrl, alt }: BeforeAfterSlide
   if (!afterUrl) {
     return (
       <div className="flex aspect-video items-center justify-center overflow-hidden rounded-lg border bg-[linear-gradient(45deg,hsl(var(--muted))_25%,transparent_25%,transparent_75%,hsl(var(--muted))_75%),linear-gradient(45deg,hsl(var(--muted))_25%,transparent_25%,transparent_75%,hsl(var(--muted))_75%)] bg-[length:20px_20px] bg-[position:0_0,10px_10px]">
-        <img src={beforeUrl} alt={alt} className="h-full w-full object-contain" />
+        <img src={beforeUrl} alt={alt} decoding="async" className="h-full w-full object-contain" />
       </div>
     );
   }
@@ -23,7 +23,12 @@ export function BeforeAfterSlider({ beforeUrl, afterUrl, alt }: BeforeAfterSlide
   return (
     <div className="grid gap-3">
       <div className="relative aspect-video overflow-hidden rounded-lg border bg-muted shadow-inner">
-        <img src={beforeUrl} alt={`${alt} original`} className="absolute inset-0 h-full w-full object-contain" />
+        <img
+          src={beforeUrl}
+          alt={`${alt} original`}
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-contain"
+        />
         <div
           className="absolute inset-0"
           style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
@@ -31,6 +36,7 @@ export function BeforeAfterSlider({ beforeUrl, afterUrl, alt }: BeforeAfterSlide
           <img
             src={afterUrl}
             alt={`${alt} compactada`}
+            decoding="async"
             className="absolute inset-0 h-full w-full object-contain"
           />
         </div>

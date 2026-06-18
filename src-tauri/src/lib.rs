@@ -8,7 +8,7 @@ use image::{
     RgbImage,
 };
 use mozjpeg_rs::{Encoder, Preset};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tauri::ipc::{InvokeBody, Request, Response};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -31,19 +31,10 @@ struct CompressionSettings {
     strip_metadata: bool,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Copy)]
 struct ImageDimensions {
     width: u32,
     height: u32,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct NativeCompressionResponse {
-    contents: Vec<u8>,
-    original_dimensions: ImageDimensions,
-    final_dimensions: ImageDimensions,
 }
 
 #[tauri::command]
@@ -245,11 +236,28 @@ fn encode_jpeg(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
-fn compress_jpeg_image(
+fn encode_native_compression_payload(
+    contents: Vec<u8>,
+    original_dimensions: ImageDimensions,
+    final_dimensions: ImageDimensions,
+) -> Vec<u8> {
+    let header = format!(
+        "{},{},{},{}\n",
+        original_dimensions.width,
+        original_dimensions.height,
+        final_dimensions.width,
+        final_dimensions.height
+    );
+    let mut payload = Vec::with_capacity(header.len() + contents.len());
+    payload.extend_from_slice(header.as_bytes());
+    payload.extend_from_slice(&contents);
+    payload
+}
+
+fn compress_jpeg_image_blocking(
     source_path: PathBuf,
     settings: CompressionSettings,
-) -> Result<NativeCompressionResponse, String> {
+) -> Result<Response, String> {
     let (image, exif_data, icc_profile) = load_image(&source_path, settings.strip_metadata)?;
     let original_dimensions = ImageDimensions {
         width: image.width(),
@@ -259,11 +267,23 @@ fn compress_jpeg_image(
     let rgb = flatten_to_rgb(image);
     let contents = encode_jpeg(&rgb, &settings, exif_data, icc_profile)?;
 
-    Ok(NativeCompressionResponse {
+    Ok(Response::new(encode_native_compression_payload(
         contents,
         original_dimensions,
         final_dimensions,
+    )))
+}
+
+#[tauri::command]
+async fn compress_jpeg_image(
+    source_path: PathBuf,
+    settings: CompressionSettings,
+) -> Result<Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        compress_jpeg_image_blocking(source_path, settings)
     })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -302,7 +322,10 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{write_compressed_image, write_compressed_image_to_path};
+    use super::{
+        encode_native_compression_payload, write_compressed_image, write_compressed_image_to_path,
+        ImageDimensions,
+    };
     use std::{
         fs,
         time::{SystemTime, UNIX_EPOCH},
@@ -356,5 +379,27 @@ mod tests {
             b"imagem"
         );
         fs::remove_dir_all(directory).expect("nao foi possivel limpar a pasta de teste");
+    }
+
+    #[test]
+    fn encodes_native_compression_payload_with_dimension_header() {
+        let payload = encode_native_compression_payload(
+            vec![0xff, 0xd8, 0xff],
+            ImageDimensions {
+                width: 4000,
+                height: 3000,
+            },
+            ImageDimensions {
+                width: 1920,
+                height: 1440,
+            },
+        );
+        let header_end = payload
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .expect("cabecalho ausente");
+
+        assert_eq!(&payload[..header_end], b"4000,3000,1920,1440");
+        assert_eq!(&payload[header_end + 1..], &[0xff, 0xd8, 0xff]);
     }
 }
