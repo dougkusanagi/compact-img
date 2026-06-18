@@ -1,6 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import type { SelectedImage } from "@/lib/image-types";
+import type { CompressionSettings, NativeCompressionResponse, WorkerResponse, SelectedImage } from "@/lib/image-types";
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   avif: "image/avif",
@@ -67,6 +67,12 @@ type SaveCompressedImageInput = {
   destinationPath?: string;
 };
 
+type NativeJpegCompressionInput = {
+  id: string;
+  sourcePath: string;
+  settings: CompressionSettings;
+};
+
 export function buildSiblingDestinationPath(sourcePath: string, fileName: string) {
   const segments = sourcePath.split(/[\\/]/);
   segments.pop();
@@ -86,6 +92,23 @@ export async function chooseSavePath(sourcePath: string | undefined, fileName: s
   });
 }
 
+export async function chooseDirectory(): Promise<string | null> {
+  const selected = await open({
+    directory: true,
+    multiple: false,
+    title: "Escolher pasta para salvar imagens"
+  });
+
+  return Array.isArray(selected) ? selected[0] : selected;
+}
+
+export function joinPath(directory: string, fileName: string) {
+  const isWindows = directory.includes("\\") || !directory.includes("/");
+  const separator = isWindows ? "\\" : "/";
+  const base = directory.endsWith(separator) ? directory.slice(0, -1) : directory;
+  return `${base}${separator}${fileName}`;
+}
+
 export async function saveCompressedImage({
   blob,
   fileName,
@@ -101,4 +124,22 @@ export async function saveCompressedImage({
       ...(destinationPath ? { "x-destination-path": encodeURIComponent(destinationPath) } : {})
     }
   });
+}
+
+export async function compressNativeJpeg({
+  id,
+  sourcePath,
+  settings
+}: NativeJpegCompressionInput): Promise<WorkerResponse> {
+  const result = await invoke<NativeCompressionResponse>("compress_jpeg_image", {
+    sourcePath,
+    settings
+  });
+
+  return {
+    id,
+    blob: new Blob([new Uint8Array(result.contents)], { type: "image/jpeg" }),
+    originalDimensions: result.originalDimensions,
+    finalDimensions: result.finalDimensions
+  };
 }

@@ -3,6 +3,7 @@ import type { OutputFormat } from "@/lib/utils";
 export type ImageStatus = "pending" | "processing" | "done" | "error";
 
 export type CompressionSettings = {
+  preserveOriginalDimensions: boolean;
   maxWidth: number;
   maxHeight: number;
   quality: number;
@@ -51,4 +52,10 @@ export type WorkerResponse = {
   originalDimensions?: ImageDimensions;
   finalDimensions?: ImageDimensions;
   error?: string;
+};
+
+export type NativeCompressionResponse = {
+  contents: number[];
+  originalDimensions: ImageDimensions;
+  finalDimensions: ImageDimensions;
 };

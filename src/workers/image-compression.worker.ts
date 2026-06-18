@@ -10,10 +10,15 @@ const MIME_BY_FORMAT = {
 function getTargetDimensions(
   width: number,
   height: number,
+  preserveOriginalDimensions: boolean,
   maxWidth: number,
   maxHeight: number,
   keepAspectRatio: boolean
 ) {
+  if (preserveOriginalDimensions) {
+    return { width, height };
+  }
+
   if (!keepAspectRatio) {
     return {
       width: Math.max(1, Math.min(maxWidth, width)),
@@ -44,6 +49,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     const finalDimensions = getTargetDimensions(
       originalDimensions.width,
       originalDimensions.height,
+      settings.preserveOriginalDimensions,
       settings.maxWidth,
       settings.maxHeight,
       settings.keepAspectRatio

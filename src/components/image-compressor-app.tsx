@@ -11,13 +11,21 @@ import type {
   WorkerResponse
 } from "@/lib/image-types";
 import { createImageId, isAcceptedImage, readImageDimensions } from "@/lib/image-utils";
-import { chooseSavePath, isDesktopApp, saveCompressedImage } from "@/lib/desktop";
+import {
+  chooseDirectory,
+  chooseSavePath,
+  compressNativeJpeg,
+  isDesktopApp,
+  joinPath,
+  saveCompressedImage
+} from "@/lib/desktop";
 import { replaceExtension } from "@/lib/utils";
 import { CompressionSettings as CompressionSettingsPanel } from "@/components/compression-settings";
 import { ImageDropzone } from "@/components/image-dropzone";
 import { ImageQueue } from "@/components/image-queue";
 
 const DEFAULT_SETTINGS: CompressionSettings = {
+  preserveOriginalDimensions: true,
   maxWidth: 1920,
   maxHeight: 1080,
   quality: 78,
@@ -26,6 +34,14 @@ const DEFAULT_SETTINGS: CompressionSettings = {
   stripMetadata: true
 };
 const DEFAULT_DOWNLOAD_MODE: DownloadMode = "same-folder";
+
+function shouldUseNativeJpegCompression(
+  settings: CompressionSettings,
+  isDesktop: boolean,
+  sourcePath?: string
+) {
+  return isDesktop && Boolean(sourcePath) && settings.outputFormat === "jpeg";
+}
 
 function compressInWorker(file: File, id: string, settings: CompressionSettings) {
   return new Promise<WorkerResponse>((resolve) => {
@@ -79,7 +95,7 @@ export function ImageCompressorApp() {
     const saved = localStorage.getItem("compact-img-settings");
     if (saved) {
       try {
-        setSettings(JSON.parse(saved));
+        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) });
       } catch (e) {
         console.error("Erro ao carregar configuracoes:", e);
       }
@@ -199,7 +215,13 @@ export function ImageCompressorApp() {
         current.map((item) => (item.id === image.id ? { ...item, status: "processing" } : item))
       );
 
-      const result = await compressInWorker(image.file, image.id, settings);
+      const result = shouldUseNativeJpegCompression(settings, isDesktop, image.sourcePath)
+        ? await compressNativeJpeg({
+            id: image.id,
+            sourcePath: image.sourcePath as string,
+            settings
+          })
+        : await compressInWorker(image.file, image.id, settings);
       const compressedName = replaceExtension(image.file.name, settings.outputFormat);
 
       setImages((current) =>
@@ -239,7 +261,7 @@ export function ImageCompressorApp() {
     }
 
     setIsProcessing(false);
-  }, [images, isProcessing, settings]);
+  }, [images, isDesktop, isProcessing, settings]);
 
   const downloadImage = useCallback(async (id: string) => {
     const image = imagesRef.current.find((item) => item.id === id);
@@ -286,10 +308,60 @@ export function ImageCompressorApp() {
       (image) => image.status === "done" && image.compressedBlob && image.compressedName
     );
 
-    for (const image of readyImages) {
-      await downloadImage(image.id);
+    if (!readyImages.length) {
+      return;
     }
-  }, [downloadImage]);
+
+    let batchDirectory: string | null = null;
+
+    if (downloadMode === "choose-location") {
+      batchDirectory = await chooseDirectory();
+      if (!batchDirectory) {
+        return; // Usuário cancelou a seleção da pasta
+      }
+    }
+
+    for (const image of readyImages) {
+      if (!image.compressedBlob || !image.compressedName) {
+        continue;
+      }
+
+      try {
+        let destinationPath: string | undefined = undefined;
+
+        if (batchDirectory) {
+          destinationPath = joinPath(batchDirectory, image.compressedName);
+        } else {
+          // Se "same-folder" mas a imagem não tem sourcePath, precisa escolher local
+          if (!image.sourcePath) {
+            const chosen = await chooseSavePath(undefined, image.compressedName);
+            if (!chosen) {
+              continue;
+            }
+            destinationPath = chosen;
+          }
+        }
+
+        const savedPath = await saveCompressedImage({
+          blob: image.compressedBlob,
+          fileName: image.compressedName,
+          sourcePath: image.sourcePath,
+          destinationPath
+        });
+
+        setImages((current) =>
+          current.map((item) =>
+            item.id === image.id ? { ...item, savedPath, downloadError: undefined } : item
+          )
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Não foi possível baixar a imagem compactada.";
+        setImages((current) =>
+          current.map((item) => (item.id === image.id ? { ...item, downloadError: message } : item))
+        );
+      }
+    }
+  }, [downloadMode]);
 
   useEffect(() => {
     imagesRef.current = images;

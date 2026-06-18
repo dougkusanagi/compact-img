@@ -64,6 +64,16 @@ export function CompressionSettings({ settings, onChange, disabled }: Compressio
         </div>
       </CardHeader>
       <CardContent className="grid gap-5 p-5">
+        <div className="flex items-center justify-between gap-4 rounded-md bg-muted/55 p-3">
+          <Label htmlFor="preserve-dimensions">Manter dimensoes originais</Label>
+          <Switch
+            id="preserve-dimensions"
+            checked={settings.preserveOriginalDimensions}
+            disabled={disabled}
+            onCheckedChange={(checked) => update("preserveOriginalDimensions", checked)}
+          />
+        </div>
+
         <div className="grid gap-3">
           <div className="flex items-center gap-2">
             <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -75,7 +85,7 @@ export function CompressionSettings({ settings, onChange, disabled }: Compressio
             type="number"
             min={1}
             value={settings.maxWidth}
-            disabled={disabled}
+            disabled={disabled || settings.preserveOriginalDimensions}
             aria-label="Largura máxima"
             onChange={(event) => update("maxWidth", Number(event.target.value) || 1)}
           />
@@ -85,12 +95,16 @@ export function CompressionSettings({ settings, onChange, disabled }: Compressio
             type="number"
             min={1}
             value={settings.maxHeight}
-            disabled={disabled}
+            disabled={disabled || settings.preserveOriginalDimensions}
             aria-label="Altura máxima"
             onChange={(event) => update("maxHeight", Number(event.target.value) || 1)}
           />
           </div>
-          <p className="text-xs text-muted-foreground">Largura × altura em pixels</p>
+          <p className="text-xs text-muted-foreground">
+            {settings.preserveOriginalDimensions
+              ? "A imagem sera exportada com a mesma largura e altura do arquivo original."
+              : "Largura × altura em pixels"}
+          </p>
         </div>
 
         <div className="grid gap-3 border-t pt-5">
@@ -151,7 +165,7 @@ export function CompressionSettings({ settings, onChange, disabled }: Compressio
           <Switch
             id="aspect"
             checked={settings.keepAspectRatio}
-            disabled={disabled}
+            disabled={disabled || settings.preserveOriginalDimensions}
             onCheckedChange={(checked) => update("keepAspectRatio", checked)}
           />
         </div>
