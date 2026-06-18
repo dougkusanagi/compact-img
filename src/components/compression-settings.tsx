@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CompressionSettings as CompressionSettingsType } from "@/lib/image-types";
+import type { CompressionSettings as CompressionSettingsType, JpegCompressionMode } from "@/lib/image-types";
 import type { OutputFormat } from "@/lib/utils";
 import { Gauge, ImageIcon, Maximize2, Settings2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -159,6 +159,36 @@ export function CompressionSettings({ settings, onChange, disabled }: Compressio
             </SelectContent>
           </Select>
         </div>
+
+        {settings.outputFormat === "jpeg" ? (
+          <div className="grid gap-2 border-t pt-5">
+            <div className="flex items-center gap-2">
+              <Gauge className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label>Modo JPG</Label>
+            </div>
+            <Select
+              value={settings.jpegCompressionMode}
+              disabled={disabled}
+              onValueChange={(value) => update("jpegCompressionMode", value as JpegCompressionMode)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Modo de compressao" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fast">Rapida</SelectItem>
+                <SelectItem value="balanced">Balanceada</SelectItem>
+                <SelectItem value="max">Compressao maxima</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {settings.jpegCompressionMode === "fast"
+                ? "Prioriza velocidade. Costuma gerar arquivos maiores."
+                : settings.jpegCompressionMode === "balanced"
+                  ? "Equilibra tempo de processamento e tamanho final."
+                  : "Prioriza menor tamanho. Costuma demorar mais para concluir."}
+            </p>
+          </div>
+        ) : null}
 
         <div className="flex items-center justify-between gap-4 rounded-md bg-muted/55 p-3">
           <Label htmlFor="aspect">Manter proporção</Label>

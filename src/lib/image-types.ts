@@ -1,6 +1,7 @@
 import type { OutputFormat } from "@/lib/utils";
 
 export type ImageStatus = "pending" | "processing" | "done" | "error";
+export type JpegCompressionMode = "fast" | "balanced" | "max";
 
 export type CompressionSettings = {
   preserveOriginalDimensions: boolean;
@@ -8,6 +9,7 @@ export type CompressionSettings = {
   maxHeight: number;
   quality: number;
   outputFormat: OutputFormat;
+  jpegCompressionMode: JpegCompressionMode;
   keepAspectRatio: boolean;
   stripMetadata: boolean;
 };

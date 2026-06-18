@@ -30,10 +30,20 @@ const DEFAULT_SETTINGS: CompressionSettings = {
   maxHeight: 1080,
   quality: 78,
   outputFormat: "webp",
+  jpegCompressionMode: "balanced",
   keepAspectRatio: true,
   stripMetadata: true
 };
 const DEFAULT_DOWNLOAD_MODE: DownloadMode = "same-folder";
+
+function getProcessingConcurrency(totalImages: number) {
+  const hardwareConcurrency =
+    typeof navigator !== "undefined" && Number.isFinite(navigator.hardwareConcurrency)
+      ? navigator.hardwareConcurrency
+      : 4;
+
+  return Math.min(totalImages, Math.max(1, Math.min(4, hardwareConcurrency - 1 || 1)));
+}
 
 function shouldUseNativeJpegCompression(
   settings: CompressionSettings,
@@ -72,6 +82,20 @@ function revokeImageUrls(image: QueueImage) {
   if (image.compressedUrl) {
     URL.revokeObjectURL(image.compressedUrl);
   }
+}
+
+async function compressImage(
+  image: QueueImage,
+  settings: CompressionSettings,
+  isDesktop: boolean
+) {
+  return shouldUseNativeJpegCompression(settings, isDesktop, image.sourcePath)
+    ? compressNativeJpeg({
+        id: image.id,
+        sourcePath: image.sourcePath as string,
+        settings
+      })
+    : compressInWorker(image.file, image.id, settings);
 }
 
 export function ImageCompressorApp() {
@@ -210,55 +234,61 @@ export function ImageCompressorApp() {
       })
     );
 
-    for (const image of images) {
-      setImages((current) =>
-        current.map((item) => (item.id === image.id ? { ...item, status: "processing" } : item))
-      );
+    const queue = [...images];
+    const concurrency = getProcessingConcurrency(queue.length);
 
-      const result = shouldUseNativeJpegCompression(settings, isDesktop, image.sourcePath)
-        ? await compressNativeJpeg({
-            id: image.id,
-            sourcePath: image.sourcePath as string,
-            settings
-          })
-        : await compressInWorker(image.file, image.id, settings);
-      const compressedName = replaceExtension(image.file.name, settings.outputFormat);
+    const workerLoop = async () => {
+      while (queue.length) {
+        const image = queue.shift();
+        if (!image) {
+          return;
+        }
 
-      setImages((current) =>
-        current.map((item) => {
-          if (item.id !== image.id) {
-            return item;
-          }
+        setImages((current) =>
+          current.map((item) => (item.id === image.id ? { ...item, status: "processing" } : item))
+        );
 
-          if (result.error || !result.blob) {
+        const result = await compressImage(image, settings, isDesktop);
+        const compressedName = replaceExtension(image.file.name, settings.outputFormat);
+
+        setImages((current) =>
+          current.map((item) => {
+            if (item.id !== image.id) {
+              return item;
+            }
+
+            if (result.error || !result.blob) {
+              return {
+                ...item,
+                compressedBlob: result.blob,
+                compressedUrl: result.blob ? URL.createObjectURL(result.blob) : undefined,
+                compressedName: result.blob ? compressedName : undefined,
+                originalDimensions: result.originalDimensions ?? item.originalDimensions,
+                finalDimensions: result.finalDimensions,
+                status: "error",
+                error: result.error ?? "Nao foi possivel compactar esta imagem."
+              };
+            }
+
             return {
               ...item,
               compressedBlob: result.blob,
-              compressedUrl: result.blob ? URL.createObjectURL(result.blob) : undefined,
-              compressedName: result.blob ? compressedName : undefined,
+              compressedUrl: URL.createObjectURL(result.blob),
+              compressedName,
+              savedPath: undefined,
               originalDimensions: result.originalDimensions ?? item.originalDimensions,
               finalDimensions: result.finalDimensions,
-              status: "error",
-              error: result.error ?? "Nao foi possivel compactar esta imagem."
+              status: "done",
+              error: undefined,
+              downloadError: undefined
             };
-          }
+          })
+        );
+        setProcessedCount((count) => count + 1);
+      }
+    };
 
-          return {
-            ...item,
-            compressedBlob: result.blob,
-            compressedUrl: URL.createObjectURL(result.blob),
-            compressedName,
-            savedPath: undefined,
-            originalDimensions: result.originalDimensions ?? item.originalDimensions,
-            finalDimensions: result.finalDimensions,
-            status: "done",
-            error: undefined,
-            downloadError: undefined
-          };
-        })
-      );
-      setProcessedCount((count) => count + 1);
-    }
+    await Promise.all(Array.from({ length: concurrency }, () => workerLoop()));
 
     setIsProcessing(false);
   }, [images, isDesktop, isProcessing, settings]);

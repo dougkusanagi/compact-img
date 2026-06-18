@@ -13,11 +13,20 @@ use tauri::ipc::{InvokeBody, Request, Response};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+enum JpegCompressionMode {
+    Fast,
+    Balanced,
+    Max,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct CompressionSettings {
     preserve_original_dimensions: bool,
     max_width: u32,
     max_height: u32,
     quality: u8,
+    jpeg_compression_mode: JpegCompressionMode,
     keep_aspect_ratio: bool,
     strip_metadata: bool,
 }
@@ -214,7 +223,12 @@ fn encode_jpeg(
     exif_data: Option<Vec<u8>>,
     icc_profile: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, String> {
-    let mut encoder = Encoder::new(Preset::ProgressiveSmallest).quality(settings.quality);
+    let preset = match settings.jpeg_compression_mode {
+        JpegCompressionMode::Fast => Preset::BaselineFastest,
+        JpegCompressionMode::Balanced => Preset::ProgressiveBalanced,
+        JpegCompressionMode::Max => Preset::ProgressiveSmallest,
+    };
+    let mut encoder = Encoder::new(preset).quality(settings.quality);
 
     if !settings.strip_metadata {
         if let Some(exif_data) = exif_data {
