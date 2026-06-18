@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { LockKeyhole, Sparkles } from "lucide-react";
 import type {
   CompressionSettings,
@@ -36,13 +36,23 @@ const DEFAULT_SETTINGS: CompressionSettings = {
 };
 const DEFAULT_DOWNLOAD_MODE: DownloadMode = "same-folder";
 
-function getProcessingConcurrency(totalImages: number) {
+function getProcessingConcurrency(
+  totalImages: number,
+  settings: CompressionSettings,
+  isDesktop: boolean
+) {
   const hardwareConcurrency =
     typeof navigator !== "undefined" && Number.isFinite(navigator.hardwareConcurrency)
       ? navigator.hardwareConcurrency
       : 4;
 
-  return Math.min(totalImages, Math.max(1, Math.min(4, hardwareConcurrency - 1 || 1)));
+  const maxConcurrency = shouldUseNativeJpegCompression(settings, isDesktop, "native-jpeg")
+    ? settings.jpegCompressionMode === "fast"
+      ? 2
+      : 1
+    : 4;
+
+  return Math.min(totalImages, Math.max(1, Math.min(maxConcurrency, hardwareConcurrency - 1 || 1)));
 }
 
 function shouldUseNativeJpegCompression(
@@ -108,6 +118,13 @@ export function ImageCompressorApp() {
   const [isDesktop, setIsDesktop] = useState(false);
   const [downloadMode, setDownloadMode] = useState<DownloadMode>(DEFAULT_DOWNLOAD_MODE);
   const imagesRef = useRef<QueueImage[]>([]);
+  const deferredImages = useDeferredValue(images);
+
+  const updateImages = useCallback((updater: (current: QueueImage[]) => QueueImage[]) => {
+    startTransition(() => {
+      setImages(updater);
+    });
+  }, []);
 
   const handleSettingsChange = useCallback((newSettings: CompressionSettings) => {
     setSettings(newSettings);
@@ -137,8 +154,8 @@ export function ImageCompressorApp() {
   }, []);
 
   const selectedImage = useMemo(
-    () => images.find((image) => image.id === selectedId) ?? images[0],
-    [images, selectedId]
+    () => deferredImages.find((image) => image.id === selectedId) ?? deferredImages[0],
+    [deferredImages, selectedId]
   );
 
   const progress = images.length ? (processedCount / images.length) * 100 : 0;
@@ -165,18 +182,18 @@ export function ImageCompressorApp() {
       return;
     }
 
-    setImages((current) => [...current, ...nextImages]);
+    updateImages((current) => [...current, ...nextImages]);
     setSelectedId((current) => current ?? nextImages[0].id);
 
     nextImages.forEach((image) => {
       readImageDimensions(image.file)
         .then((dimensions) => {
-          setImages((current) =>
+          updateImages((current) =>
             current.map((item) => (item.id === image.id ? { ...item, originalDimensions: dimensions } : item))
           );
         })
         .catch(() => {
-          setImages((current) =>
+          updateImages((current) =>
             current.map((item) =>
               item.id === image.id
                 ? { ...item, status: "error", error: "Nao foi possivel ler as dimensoes da imagem." }
@@ -185,10 +202,10 @@ export function ImageCompressorApp() {
           );
         });
     });
-  }, []);
+  }, [updateImages]);
 
   const removeImage = useCallback((id: string) => {
-    setImages((current) => {
+    updateImages((current) => {
       const image = current.find((item) => item.id === id);
       if (image) {
         revokeImageUrls(image);
@@ -196,17 +213,17 @@ export function ImageCompressorApp() {
       return current.filter((item) => item.id !== id);
     });
     setSelectedId((current) => (current === id ? undefined : current));
-  }, []);
+  }, [updateImages]);
 
   const clearAll = useCallback(() => {
-    setImages((current) => {
+    updateImages((current) => {
       current.forEach(revokeImageUrls);
       return [];
     });
     setSelectedId(undefined);
     setInvalidFiles([]);
     setProcessedCount(0);
-  }, []);
+  }, [updateImages]);
 
   const processBatch = useCallback(async () => {
     if (!images.length || isProcessing) {
@@ -214,8 +231,10 @@ export function ImageCompressorApp() {
     }
 
     setIsProcessing(true);
-    setProcessedCount(0);
-    setImages((current) =>
+    startTransition(() => {
+      setProcessedCount(0);
+    });
+    updateImages((current) =>
       current.map((image) => {
         if (image.compressedUrl) {
           URL.revokeObjectURL(image.compressedUrl);
@@ -235,7 +254,7 @@ export function ImageCompressorApp() {
     );
 
     const queue = [...images];
-    const concurrency = getProcessingConcurrency(queue.length);
+    const concurrency = getProcessingConcurrency(queue.length, settings, isDesktop);
 
     const workerLoop = async () => {
       while (queue.length) {
@@ -244,14 +263,14 @@ export function ImageCompressorApp() {
           return;
         }
 
-        setImages((current) =>
+        updateImages((current) =>
           current.map((item) => (item.id === image.id ? { ...item, status: "processing" } : item))
         );
 
         const result = await compressImage(image, settings, isDesktop);
         const compressedName = replaceExtension(image.file.name, settings.outputFormat);
 
-        setImages((current) =>
+        updateImages((current) =>
           current.map((item) => {
             if (item.id !== image.id) {
               return item;
@@ -284,14 +303,19 @@ export function ImageCompressorApp() {
             };
           })
         );
-        setProcessedCount((count) => count + 1);
+
+        startTransition(() => {
+          setProcessedCount((count) => count + 1);
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
     };
 
     await Promise.all(Array.from({ length: concurrency }, () => workerLoop()));
 
     setIsProcessing(false);
-  }, [images, isDesktop, isProcessing, settings]);
+  }, [images, isDesktop, isProcessing, settings, updateImages]);
 
   const downloadImage = useCallback(async (id: string) => {
     const image = imagesRef.current.find((item) => item.id === id);
@@ -314,7 +338,7 @@ export function ImageCompressorApp() {
         destinationPath: destinationPath ?? undefined
       });
 
-      setImages((current) =>
+      updateImages((current) =>
         current.map((item) =>
           item.id === id
             ? { ...item, savedPath, downloadError: undefined }
@@ -323,7 +347,7 @@ export function ImageCompressorApp() {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nao foi possivel baixar a imagem compactada.";
-      setImages((current) =>
+      updateImages((current) =>
         current.map((item) =>
           item.id === id
             ? { ...item, downloadError: message }
@@ -331,7 +355,7 @@ export function ImageCompressorApp() {
         )
       );
     }
-  }, [downloadMode, isDesktop]);
+  }, [downloadMode, isDesktop, updateImages]);
 
   const downloadAllDesktop = useCallback(async () => {
     const readyImages = imagesRef.current.filter(
@@ -379,19 +403,19 @@ export function ImageCompressorApp() {
           destinationPath
         });
 
-        setImages((current) =>
+        updateImages((current) =>
           current.map((item) =>
             item.id === image.id ? { ...item, savedPath, downloadError: undefined } : item
           )
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : "Não foi possível baixar a imagem compactada.";
-        setImages((current) =>
+        updateImages((current) =>
           current.map((item) => (item.id === image.id ? { ...item, downloadError: message } : item))
         );
       }
     }
-  }, [downloadMode]);
+  }, [downloadMode, updateImages]);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -457,7 +481,7 @@ export function ImageCompressorApp() {
             ) : null}
 
             <ImageQueue
-              images={images}
+              images={deferredImages}
               selectedId={selectedImage?.id}
               isProcessing={isProcessing}
               isDesktop={isDesktop}
