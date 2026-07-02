@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FolderOpen, Play, RotateCcw, Trash2 } from "lucide-react";
+import { Download, FolderOpen, Play, RotateCcw, Trash2, X } from "lucide-react";
 import type { DownloadMode, QueueImage } from "@/lib/image-types";
 import { downloadImagesIndividual, downloadImagesZip } from "@/lib/download";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,13 @@ type DownloadActionsProps = {
   isDesktop: boolean;
   downloadMode: DownloadMode;
   onProcess: () => void;
+  onCancelProcess: () => void;
   onClear: () => void;
   onDownloadAllDesktop: () => void | Promise<void>;
   onDownloadModeChange: (mode: DownloadMode) => void;
   hasCompressed?: boolean;
   hasProcessed?: boolean;
+  isCancelRequested?: boolean;
   compact?: boolean;
 };
 
@@ -27,11 +29,13 @@ export function DownloadActions({
   isDesktop,
   downloadMode,
   onProcess,
+  onCancelProcess,
   onClear,
   onDownloadAllDesktop,
   onDownloadModeChange,
   hasCompressed: hasCompressedProp,
   hasProcessed: hasProcessedProp,
+  isCancelRequested = false,
   compact = false
 }: DownloadActionsProps) {
   const hasImages = images.length > 0;
@@ -61,10 +65,35 @@ export function DownloadActions({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2 ml-auto">
-        <Button className={cn(!compact && "w-full")} size={compact ? "sm" : "default"} disabled={!hasImages || isProcessing} onClick={onProcess}>
-          {hasProcessed ? <RotateCcw className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          {hasProcessed ? "Reprocessar" : "Compactar"}
-        </Button>
+        {isProcessing ? (
+          <Button
+            className={cn(!compact && "w-full")}
+            size={compact ? "sm" : "default"}
+            variant="destructive"
+            disabled={isCancelRequested}
+            onClick={() => {
+              if (isCancelRequested) {
+                return;
+              }
+
+              const confirmed = window.confirm(
+                "Cancelar o processamento agora? A imagem atual pode terminar antes da interrupcao."
+              );
+
+              if (confirmed) {
+                onCancelProcess();
+              }
+            }}
+          >
+            {isCancelRequested ? <RotateCcw className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+            {isCancelRequested ? "Cancelando..." : "Cancelar"}
+          </Button>
+        ) : (
+          <Button className={cn(!compact && "w-full")} size={compact ? "sm" : "default"} disabled={!hasImages} onClick={onProcess}>
+            {hasProcessed ? <RotateCcw className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {hasProcessed ? "Reprocessar" : "Compactar"}
+          </Button>
+        )}
         {isDesktop ? (
           <Button
             variant="outline"

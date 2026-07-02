@@ -35,6 +35,14 @@ const DEFAULT_SETTINGS: CompressionSettings = {
   stripMetadata: true
 };
 const DEFAULT_DOWNLOAD_MODE: DownloadMode = "same-folder";
+const WORKER_TIMEOUT_MS = 30000;
+
+class CompressionTimeoutError extends Error {
+  constructor() {
+    super("A compactacao demorou demais para responder no worker.");
+    this.name = "CompressionTimeoutError";
+  }
+}
 
 function getProcessingConcurrency(
   totalImages: number,
@@ -64,22 +72,46 @@ function shouldUseNativeJpegCompression(
 }
 
 function compressInWorker(file: File, id: string, settings: CompressionSettings) {
-  return new Promise<WorkerResponse>((resolve) => {
+  return new Promise<WorkerResponse>((resolve, reject) => {
     const worker = new Worker(new URL("../workers/image-compression.worker.ts", import.meta.url), {
       type: "module"
     });
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      worker.terminate();
+      reject(new CompressionTimeoutError());
+    }, WORKER_TIMEOUT_MS);
+
+    const finalize = () => {
+      if (settled) {
+        return false;
+      }
+
+      settled = true;
+      window.clearTimeout(timeoutId);
+      worker.terminate();
+      return true;
+    };
 
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      worker.terminate();
+      if (!finalize()) {
+        return;
+      }
+
       resolve(event.data);
     };
 
     worker.onerror = (event) => {
-      worker.terminate();
-      resolve({
-        id,
-        error: event.message || "Erro ao executar o worker de compressao."
-      });
+      if (!finalize()) {
+        return;
+      }
+
+      reject(new Error(event.message || "Erro ao executar o worker de compressao."));
     };
 
     const request: WorkerRequest = { id, file, settings };
@@ -99,13 +131,21 @@ async function compressImage(
   settings: CompressionSettings,
   isDesktop: boolean
 ) {
-  return shouldUseNativeJpegCompression(settings, isDesktop, image.sourcePath)
-    ? compressNativeJpeg({
-        id: image.id,
-        sourcePath: image.sourcePath as string,
-        settings
-      })
-    : compressInWorker(image.file, image.id, settings);
+  if (shouldUseNativeJpegCompression(settings, isDesktop, image.sourcePath)) {
+    return compressNativeJpeg({
+      id: image.id,
+      sourcePath: image.sourcePath as string,
+      settings
+    });
+  }
+
+  const result = await compressInWorker(image.file, image.id, settings);
+
+  if (result.error || !result.blob) {
+    throw new Error(result.error ?? "Nao foi possivel compactar esta imagem no worker.");
+  }
+
+  return result;
 }
 
 export function ImageCompressorApp() {
@@ -114,10 +154,12 @@ export function ImageCompressorApp() {
   const [selectedId, setSelectedId] = useState<string>();
   const [invalidFiles, setInvalidFiles] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCancelRequested, setIsCancelRequested] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
   const [isDesktop, setIsDesktop] = useState(false);
   const [downloadMode, setDownloadMode] = useState<DownloadMode>(DEFAULT_DOWNLOAD_MODE);
   const imagesRef = useRef<QueueImage[]>([]);
+  const cancelRequestedRef = useRef(false);
   const deferredImages = useDeferredValue(images);
 
   const updateImages = useCallback((updater: (current: QueueImage[]) => QueueImage[]) => {
@@ -230,6 +272,8 @@ export function ImageCompressorApp() {
       return;
     }
 
+    cancelRequestedRef.current = false;
+    setIsCancelRequested(false);
     setIsProcessing(true);
     startTransition(() => {
       setProcessedCount(0);
@@ -257,9 +301,13 @@ export function ImageCompressorApp() {
     const concurrency = getProcessingConcurrency(queue.length, settings, isDesktop);
 
     const workerLoop = async () => {
-      while (queue.length) {
+      while (queue.length && !cancelRequestedRef.current) {
         const image = queue.shift();
         if (!image) {
+          return;
+        }
+
+        if (cancelRequestedRef.current) {
           return;
         }
 
@@ -267,7 +315,15 @@ export function ImageCompressorApp() {
           current.map((item) => (item.id === image.id ? { ...item, status: "processing" } : item))
         );
 
-        const result = await compressImage(image, settings, isDesktop);
+        let result: WorkerResponse;
+        try {
+          result = await compressImage(image, settings, isDesktop);
+        } catch (error) {
+          result = {
+            id: image.id,
+            error: error instanceof Error ? error.message : "Nao foi possivel compactar esta imagem."
+          };
+        }
         const compressedName = replaceExtension(image.file.name, settings.outputFormat);
 
         updateImages((current) =>
@@ -312,10 +368,23 @@ export function ImageCompressorApp() {
       }
     };
 
-    await Promise.all(Array.from({ length: concurrency }, () => workerLoop()));
-
-    setIsProcessing(false);
+    try {
+      await Promise.all(Array.from({ length: concurrency }, () => workerLoop()));
+    } finally {
+      cancelRequestedRef.current = false;
+      setIsCancelRequested(false);
+      setIsProcessing(false);
+    }
   }, [images, isDesktop, isProcessing, settings, updateImages]);
+
+  const cancelProcessing = useCallback(() => {
+    if (!isProcessing || cancelRequestedRef.current) {
+      return;
+    }
+
+    cancelRequestedRef.current = true;
+    setIsCancelRequested(true);
+  }, [isProcessing]);
 
   const downloadImage = useCallback(async (id: string) => {
     const image = imagesRef.current.find((item) => item.id === id);
@@ -478,10 +547,12 @@ export function ImageCompressorApp() {
               onSelect={setSelectedId}
               onRemove={removeImage}
               onProcess={processBatch}
+              onCancelProcess={cancelProcessing}
               onClear={clearAll}
               onDownload={downloadImage}
               onDownloadAllDesktop={downloadAllDesktop}
               onDownloadModeChange={handleDownloadModeChange}
+              isCancelRequested={isCancelRequested}
             />
           </div>
 

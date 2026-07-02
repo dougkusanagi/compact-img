@@ -32,10 +32,12 @@ type ImageQueueProps = {
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
   onProcess: () => void;
+  onCancelProcess: () => void;
   onClear: () => void;
   onDownload: (id: string) => void | Promise<void>;
   onDownloadAllDesktop: () => void | Promise<void>;
   onDownloadModeChange: (mode: DownloadMode) => void;
+  isCancelRequested?: boolean;
 };
 
 const STATUS_CONFIG: Record<
@@ -147,7 +149,7 @@ function ImageQueueItemComponent({
             )}
             {image.status === "processing" && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
-                <LoaderCircle className="h-5 w-5 animate-spin text-white" />
+                <LoaderCircle className="h-5 w-5 loading-spinner text-white" />
               </div>
             )}
             {image.status === "error" && (
@@ -211,7 +213,7 @@ function ImageQueueItemComponent({
                       image.status === "pending" && "text-muted-foreground"
                     )}
                   >
-                    {image.status === "processing" && <LoaderCircle className="h-3 w-3 animate-spin" />}
+                    {image.status === "processing" && <LoaderCircle className="h-3 w-3 loading-spinner" />}
                     {status.label}
                   </span>
                 </>
@@ -345,10 +347,12 @@ export function ImageQueue({
   onSelect,
   onRemove,
   onProcess,
+  onCancelProcess,
   onClear,
   onDownload,
   onDownloadAllDesktop,
-  onDownloadModeChange
+  onDownloadModeChange,
+  isCancelRequested = false
 }: ImageQueueProps) {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const stats = useMemo(() => {
@@ -452,9 +456,11 @@ export function ImageQueue({
               hasCompressed={stats.hasCompressed}
               hasProcessed={stats.hasProcessed}
               onProcess={onProcess}
+              onCancelProcess={onCancelProcess}
               onClear={onClear}
               onDownloadAllDesktop={onDownloadAllDesktop}
               onDownloadModeChange={onDownloadModeChange}
+              isCancelRequested={isCancelRequested}
               compact
             />
           </div>

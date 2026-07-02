@@ -106,6 +106,8 @@ fn load_image(
 ) -> Result<(DynamicImage, Option<Vec<u8>>, Option<Vec<u8>>), String> {
     let mut decoder = ImageReader::open(source_path)
         .map_err(|error| error.to_string())?
+        .with_guessed_format()
+        .map_err(|error| error.to_string())?
         .into_decoder()
         .map_err(|error| error.to_string())?;
 

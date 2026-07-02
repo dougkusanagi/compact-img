@@ -143,7 +143,7 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop }: ImageDropz
         )}
       >
         {isImporting ? (
-          <LoaderCircle className="h-8 w-8 animate-spin" />
+          <LoaderCircle className="h-8 w-8 loading-spinner" />
         ) : dragActive ? (
           <ImagePlus className="h-8 w-8" />
         ) : (
@@ -170,7 +170,7 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop }: ImageDropz
         disabled={isImporting}
         className="mt-6 inline-flex h-11 items-center gap-2 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
       >
-        {isImporting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <MousePointerClick className="h-4 w-4" />}
+        {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <MousePointerClick className="h-4 w-4" />}
         {isImporting ? "Carregando..." : "Escolher arquivos"}
       </button>
       <div className="mt-5 flex items-center gap-2 text-xs font-medium text-muted-foreground">

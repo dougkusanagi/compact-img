@@ -1,6 +1,6 @@
 [package]
 name = "compact-img"
-version = "0.1.0"
+version = "0.1.1"
 description = "Compactacao local de imagens em lote."
 authors = ["Douglas Kusanagi"]
 edition = "2021"
