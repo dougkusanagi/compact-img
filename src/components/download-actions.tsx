@@ -2,7 +2,6 @@
 
 import { Download, Play, RotateCcw, Trash2, X } from "lucide-react";
 import type { QueueImage } from "@/lib/image-types";
-import { downloadImagesIndividual, downloadImagesZip } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +13,7 @@ type DownloadActionsProps = {
   onCancelProcess: () => void;
   onClear: () => void;
   onDownloadAllDesktop: () => void | Promise<void>;
+  onDownloadAllWeb: (format: "individual" | "zip") => void | Promise<void>;
   hasCompressed?: boolean;
   hasProcessed?: boolean;
   isCancelRequested?: boolean;
@@ -28,6 +28,7 @@ export function DownloadActions({
   onCancelProcess,
   onClear,
   onDownloadAllDesktop,
+  onDownloadAllWeb,
   hasCompressed: hasCompressedProp,
   hasProcessed: hasProcessedProp,
   isCancelRequested = false,
@@ -42,7 +43,7 @@ export function DownloadActions({
       <div className={cn("grid w-full gap-2", isDesktop ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2")}>
         {isProcessing ? (
           <Button
-            className={cn("h-[4.5rem] w-full", !compact && "w-full")}
+            className={cn(compact ? "h-10 w-full" : "h-12 w-full")}
             size={compact ? "sm" : "default"}
             variant="destructive"
             disabled={isCancelRequested}
@@ -64,7 +65,7 @@ export function DownloadActions({
             {isCancelRequested ? "Cancelando..." : "Cancelar"}
           </Button>
         ) : (
-          <Button className={cn("h-[4.5rem] w-full", !compact && "w-full")} size={compact ? "sm" : "default"} disabled={!hasImages} onClick={onProcess}>
+          <Button className={cn(compact ? "h-10 w-full" : "h-12 w-full")} size={compact ? "sm" : "default"} disabled={!hasImages} onClick={onProcess}>
             {hasProcessed ? <RotateCcw className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {hasProcessed ? "Reprocessar" : "Compactar"}
           </Button>
@@ -72,7 +73,7 @@ export function DownloadActions({
         {isDesktop ? (
           <Button
             variant="outline"
-            className={cn("h-[4.5rem] w-full", !compact && "w-full")}
+            className={cn(compact ? "h-10 w-full" : "h-12 w-full")}
             size={compact ? "sm" : "default"}
             disabled={!hasCompressed || isProcessing}
             onClick={onDownloadAllDesktop}
@@ -84,20 +85,20 @@ export function DownloadActions({
           <>
             <Button
               variant="outline"
-              className={cn("h-[4.5rem] w-full", !compact && "w-full")}
+              className={cn(compact ? "h-10 w-full" : "h-12 w-full")}
               size={compact ? "sm" : "default"}
               disabled={!hasCompressed || isProcessing}
-              onClick={() => downloadImagesIndividual(images)}
+              onClick={() => void onDownloadAllWeb("individual")}
             >
               <Download className="h-4 w-4" />
               Baixar individual
             </Button>
             <Button
               variant="outline"
-              className={cn("h-[4.5rem] w-full", !compact && "w-full")}
+              className={cn(compact ? "h-10 w-full" : "h-12 w-full")}
               size={compact ? "sm" : "default"}
               disabled={!hasCompressed || isProcessing}
-              onClick={() => downloadImagesZip(images)}
+              onClick={() => void onDownloadAllWeb("zip")}
             >
               <Download className="h-4 w-4" />
               Baixar ZIP
@@ -105,7 +106,7 @@ export function DownloadActions({
           </>
         )}
         <Button
-          className={cn("h-[4.5rem] w-full text-muted-foreground", !compact && "w-full")}
+          className={cn(compact ? "h-10 w-full text-muted-foreground" : "h-12 w-full text-muted-foreground")}
           variant="ghost"
           size={compact ? "sm" : "default"}
           disabled={!hasImages || isProcessing}

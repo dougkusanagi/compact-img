@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -13,7 +14,6 @@ import {
   Trash2
 } from "lucide-react";
 import type { QueueImage, QueueSummary } from "@/lib/image-types";
-import { downloadBlob } from "@/lib/download";
 import { cn, formatBytes, formatPercent, getReduction } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,8 @@ type ImageQueueProps = {
   onClear: () => void;
   onDownload: (id: string) => void | Promise<void>;
   onDownloadAllDesktop: () => void | Promise<void>;
+  onDownloadAllWeb: (format: "individual" | "zip") => void | Promise<void>;
+  addImagesControl?: ReactNode;
   isCancelRequested?: boolean;
 };
 
@@ -270,14 +272,7 @@ function ImageQueueItemComponent({
             className="h-8 gap-1 rounded-lg px-2.5 text-xs font-semibold shadow-sm border-emerald-500/20 text-emerald-600 hover:bg-emerald-500/5 hover:text-emerald-700 disabled:bg-muted/50 disabled:text-muted-foreground/50 disabled:border-transparent"
             onClick={(event) => {
               event.stopPropagation();
-              if (isDesktop) {
-                void onDownload(image.id);
-                return;
-              }
-
-              if (image.compressedBlob && image.compressedName) {
-                downloadBlob(image.compressedBlob, image.compressedName);
-              }
+              void onDownload(image.id);
             }}
             aria-label="Baixar imagem"
           >
@@ -319,14 +314,7 @@ function ImageQueueItemComponent({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    if (isDesktop) {
-                      void onDownload(image.id);
-                      return;
-                    }
-
-                    downloadBlob(image.compressedBlob as Blob, image.compressedName as string);
-                  }}
+                  onClick={() => void onDownload(image.id)}
                 >
                   <Download className="h-4 w-4" />
                   Baixar imagem
@@ -358,6 +346,8 @@ export function ImageQueue({
   onClear,
   onDownload,
   onDownloadAllDesktop,
+  onDownloadAllWeb,
+  addImagesControl,
   isCancelRequested = false
 }: ImageQueueProps) {
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -437,7 +427,7 @@ export function ImageQueue({
     <Card className="overflow-hidden border-border/60 shadow-[0_12px_38px_rgba(0,0,0,0.04)]">
       {(images.length > 0 || displayedSummary) && (
         <CardHeader className="space-y-4 border-b bg-card p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary shadow-sm flex-shrink-0">
                 <ScanSearch className="h-5 w-5" />
@@ -453,7 +443,8 @@ export function ImageQueue({
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 sm:self-start">
+            <div className="flex flex-wrap items-center gap-2 sm:self-start">
+              {addImagesControl}
               <span className="rounded-full bg-muted/70 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                 {images.length > 0 ? images.length : displayedSummary?.totalCount ?? 0} {(images.length > 0 ? images.length : displayedSummary?.totalCount) === 1 ? "item" : "itens"}
               </span>
@@ -471,7 +462,7 @@ export function ImageQueue({
           </div>
 
           <div className="grid gap-3 grid-cols-3 border-t border-border/40 pt-4">
-            <MetricBadge label="Na fila" value={String(images.length > 0 ? images.length : displayedSummary?.totalCount ?? 0)} />
+            <MetricBadge label={images.length > 0 ? "Na fila" : "No lote"} value={String(images.length > 0 ? images.length : displayedSummary?.totalCount ?? 0)} />
             <MetricBadge label="Concluídas" value={String(displayedSummary?.completedCount ?? stats.completedCount)} />
             <MetricBadge
               label="Redução Média"
@@ -492,6 +483,7 @@ export function ImageQueue({
                 onCancelProcess={onCancelProcess}
                 onClear={onClear}
                 onDownloadAllDesktop={onDownloadAllDesktop}
+                onDownloadAllWeb={onDownloadAllWeb}
                 isCancelRequested={isCancelRequested}
                 compact
               />
@@ -517,8 +509,8 @@ export function ImageQueue({
             </p>
             <p className="mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground">
               {displayedSummary
-                ? "Adicione novas imagens acima para iniciar outro lote."
-                : "Adicione arquivos acima para acompanhar o status, comparar visualmente e baixar os resultados."}
+                ? "Adicione imagens para começar outro lote."
+                : "A fila aparecerá aqui depois que você adicionar imagens."}
             </p>
           </div>
         ) : (

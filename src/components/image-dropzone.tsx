@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { FileImage, ImagePlus, LoaderCircle, MousePointerClick, UploadCloud } from "lucide-react";
+import { ImagePlus, LoaderCircle, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/image-utils";
 import {
@@ -19,9 +19,11 @@ type ImageDropzoneProps = {
   onInvalidFiles: (names: string[]) => void;
   isDesktop: boolean;
   compact?: boolean;
+  mode?: "dropzone" | "button";
+  disabled?: boolean;
 };
 
-export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = false }: ImageDropzoneProps) {
+export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = false, mode = "dropzone", disabled = false }: ImageDropzoneProps) {
   const [isNativeDragActive, setIsNativeDragActive] = useState(false);
   const [importingCount, setImportingCount] = useState(0);
   const isImporting = importingCount > 0;
@@ -49,7 +51,7 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
   );
 
   useEffect(() => {
-    if (!isDesktopApp()) {
+    if (mode === "button" || !isDesktopApp()) {
       return;
     }
 
@@ -63,7 +65,7 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
         }
 
         setIsNativeDragActive(false);
-        if (payload.type !== "drop") {
+        if (payload.type !== "drop" || disabled) {
           return;
         }
 
@@ -91,18 +93,18 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
       });
 
     return () => unlisten?.();
-  }, [onFiles, onInvalidFiles]);
+  }, [disabled, mode, onFiles, onInvalidFiles]);
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     accept: ACCEPTED_IMAGE_TYPES,
     multiple: true,
     noClick: true,
-    disabled: isImporting,
+    disabled: isImporting || disabled,
     onDrop
   });
 
   const chooseFiles = useCallback(async () => {
-    if (isImporting) {
+    if (isImporting || disabled) {
       return;
     }
 
@@ -119,18 +121,35 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
     } catch {
       onInvalidFiles(["Nao foi possivel abrir os arquivos selecionados."]);
     }
-  }, [isDesktop, isImporting, onFiles, onInvalidFiles, open]);
+  }, [disabled, isDesktop, isImporting, onFiles, onInvalidFiles, open]);
 
   const dragActive = isDragActive || isNativeDragActive;
+
+  if (mode === "button") {
+    return (
+      <div {...getRootProps()} className="shrink-0">
+        <input {...getInputProps()} />
+        <button
+          type="button"
+          onClick={() => void chooseFiles()}
+          disabled={isImporting || disabled}
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3.5 text-sm font-semibold text-primary transition-colors hover:border-primary/35 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+        >
+          {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
+          {isImporting ? "Carregando..." : "Adicionar imagens"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <section
       {...getRootProps()}
       aria-busy={isImporting}
       className={cn(
-        "subtle-grid group relative flex flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed bg-card text-center transition-all duration-300",
-        compact ? "min-h-44 px-4 py-6" : "min-h-72 px-6 py-10",
-        isImporting
+        "group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed bg-card text-center transition-all duration-300",
+        compact ? "min-h-[232px] px-6 py-7 sm:px-10" : "min-h-72 px-6 py-10",
+        isImporting || disabled
           ? "border-primary/60 bg-primary/[0.04] shadow-md shadow-primary/10"
           : dragActive
           ? "scale-[1.01] border-primary bg-primary/[0.06] shadow-lg shadow-primary/10"
@@ -140,7 +159,7 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
       <input {...getInputProps()} />
       <div
         className={cn(
-        compact ? "mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300" : "mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300",
+        compact ? "mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-all duration-300" : "mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300",
           isImporting ? "scale-105" : dragActive ? "scale-110 rotate-3" : "group-hover:-translate-y-1"
         )}
       >
@@ -152,33 +171,29 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
           <UploadCloud className="h-8 w-8" />
         )}
       </div>
-      <h2 className={cn("font-bold tracking-tight", compact ? "text-base" : "text-xl")}>
+      <h2 className={cn("font-semibold tracking-tight", compact ? "text-lg" : "text-xl")}>
         {isImporting
           ? `Carregando ${importingCount} ${importingCount === 1 ? "imagem" : "imagens"}...`
           : dragActive
             ? "Pode soltar suas imagens"
-            : "Arraste imagens para começar"}
+            : "Solte imagens aqui"}
       </h2>
-      <p className={cn("mt-2 max-w-lg leading-relaxed text-muted-foreground", compact ? "text-xs" : "text-sm")}>
-        {isImporting
-          ? "Preparando os arquivos para exibir na lista. Isso pode levar alguns segundos."
-          : isDesktop
-          ? "Compacte localmente, compare o resultado e baixe depois para a mesma pasta ou para outro local."
-          : "O processamento acontece no seu dispositivo. Nenhuma imagem é enviada."}
+      <p className={cn("mt-2 max-w-lg leading-relaxed text-muted-foreground", compact ? "text-sm" : "text-sm")}>
+        {disabled
+          ? "Aguarde a conclusão do processamento para adicionar arquivos."
+          : isImporting
+            ? "Preparando os arquivos para exibir na lista. Isso pode levar alguns segundos."
+            : "JPG, PNG, WEBP e AVIF · Processamento local"}
       </p>
       <button
         type="button"
         onClick={chooseFiles}
-        disabled={isImporting}
-        className={cn("inline-flex items-center gap-2 rounded-md bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60", compact ? "mt-4 h-9 px-4 text-xs" : "mt-6 h-11 px-5 text-sm")}
+        disabled={isImporting || disabled}
+        className={cn("inline-flex items-center gap-2 rounded-lg bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60", compact ? "mt-5 h-11 px-5 text-sm" : "mt-6 h-11 px-5 text-sm")}
       >
-        {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <MousePointerClick className="h-4 w-4" />}
+        {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
         {isImporting ? "Carregando..." : "Escolher arquivos"}
       </button>
-      <div className={cn("flex items-center gap-2 text-xs font-medium text-muted-foreground", compact ? "mt-3" : "mt-5")}>
-        <FileImage className="h-3.5 w-3.5" />
-        JPG, PNG, WEBP e AVIF
-      </div>
     </section>
   );
 }

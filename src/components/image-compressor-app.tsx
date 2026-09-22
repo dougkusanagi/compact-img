@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Info, LockKeyhole, ChevronDown } from "lucide-react";
 import type {
   CompressionSettings,
@@ -13,6 +14,7 @@ import type {
   WorkerResponse
 } from "@/lib/image-types";
 import { createImageId, isAcceptedImage, readImageDimensions } from "@/lib/image-utils";
+import { downloadBlob, downloadImagesIndividual, downloadImagesZip } from "@/lib/download";
 import {
   chooseDirectory,
   chooseSavePath,
@@ -23,10 +25,11 @@ import {
   joinPath,
   saveCompressedImage
 } from "@/lib/desktop";
-import { getReduction, replaceExtension } from "@/lib/utils";
+import { cn, getReduction, replaceExtension } from "@/lib/utils";
 import { CompressionSettings as CompressionSettingsPanel } from "@/components/compression-settings";
 import { ImageDropzone } from "@/components/image-dropzone";
 import { ImageQueue } from "@/components/image-queue";
+import { BetaImageWorkspace } from "@/components/beta-image-workspace";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
@@ -167,7 +170,15 @@ async function compressImage(
   return result;
 }
 
-export function ImageCompressorApp() {
+function isAbortError(error: unknown) {
+  return typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError";
+}
+
+type ImageCompressorAppProps = {
+  variant?: "current" | "beta";
+};
+
+export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppProps) {
   const [settings, setSettings] = useState<CompressionSettings>(DEFAULT_SETTINGS);
   const [images, setImages] = useState<QueueImage[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
@@ -285,6 +296,19 @@ export function ImageCompressorApp() {
       return current.filter((item) => item.id !== id);
     });
     setSelectedId((current) => (current === id ? undefined : current));
+  }, [updateImages]);
+
+  const removeDownloadedImages = useCallback((ids: string[]) => {
+    const idsToRemove = new Set(ids);
+    if (!idsToRemove.size) {
+      return;
+    }
+
+    updateImages((current) => {
+      current.filter((image) => idsToRemove.has(image.id)).forEach(revokeImageUrls);
+      return current.filter((image) => !idsToRemove.has(image.id));
+    });
+    setSelectedId((current) => current && idsToRemove.has(current) ? undefined : current);
   }, [updateImages]);
 
   const clearAll = useCallback(() => {
@@ -452,11 +476,21 @@ export function ImageCompressorApp() {
 
   const downloadImage = useCallback(async (id: string, options?: { deferRemoval?: boolean }) => {
     const image = imagesRef.current.find((item) => item.id === id);
-    if (!image?.compressedBlob || !image.compressedName || !isDesktop) {
+    if (!image?.compressedBlob || !image.compressedName) {
       return;
     }
 
     try {
+      if (!isDesktop) {
+        await downloadBlob(image.compressedBlob, image.compressedName, {
+          chooseLocation: downloadPreferences.mode === "choose-location"
+        });
+        if (downloadPreferences.removeAfterDownload && !options?.deferRemoval) {
+          removeDownloadedImages([id]);
+        }
+        return;
+      }
+
       const mustChooseLocation = downloadPreferences.mode === "choose-location" || !image.sourcePath;
       let destinationPath: string | undefined;
       if (mustChooseLocation) {
@@ -480,10 +514,17 @@ export function ImageCompressorApp() {
         destinationPath: destinationPath ?? undefined
       });
 
-      updateImages((current) => current
-        .map((item) => item.id === id ? { ...item, savedPath, downloadError: undefined } : item)
-        .filter((item) => !(item.id === id && downloadPreferences.removeAfterDownload && !options?.deferRemoval)));
+      if (downloadPreferences.removeAfterDownload && !options?.deferRemoval) {
+        removeDownloadedImages([id]);
+      } else {
+        updateImages((current) => current.map((item) =>
+          item.id === id ? { ...item, savedPath, downloadError: undefined } : item
+        ));
+      }
     } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
       const message = error instanceof Error ? error.message : "Nao foi possivel baixar a imagem compactada.";
       updateImages((current) =>
         current.map((item) =>
@@ -493,7 +534,43 @@ export function ImageCompressorApp() {
         )
       );
     }
-  }, [downloadPreferences, isDesktop, updateImages]);
+  }, [downloadPreferences, isDesktop, removeDownloadedImages, updateImages]);
+
+  const downloadAllWeb = useCallback(async (format: "individual" | "zip") => {
+    const readyImages = imagesRef.current.filter(
+      (image) => image.status === "done" && image.compressedBlob && image.compressedName
+    );
+    if (!readyImages.length) {
+      return;
+    }
+
+    try {
+      const options = {
+        chooseLocation: downloadPreferences.mode === "choose-location",
+        subfolderName: downloadPreferences.saveInSubfolder
+          ? normalizeSubfolderName(downloadPreferences.subfolderName)
+          : undefined
+      };
+      const downloadedIds = format === "zip"
+        ? (await downloadImagesZip(readyImages, options)
+          ? readyImages.map((image) => image.id)
+          : [])
+        : await downloadImagesIndividual(readyImages, options);
+
+      if (downloadPreferences.removeAfterDownload) {
+        removeDownloadedImages(downloadedIds);
+      }
+    } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
+      const message = error instanceof Error ? error.message : "Não foi possível baixar as imagens.";
+      const readyIds = new Set(readyImages.map((image) => image.id));
+      updateImages((current) => current.map((image) =>
+        readyIds.has(image.id) ? { ...image, downloadError: message } : image
+      ));
+    }
+  }, [downloadPreferences, removeDownloadedImages, updateImages]);
 
   const downloadAllDesktop = useCallback(async () => {
     const readyImages = imagesRef.current.filter(
@@ -547,9 +624,13 @@ export function ImageCompressorApp() {
           destinationPath
         });
 
-        updateImages((current) => current
-          .map((item) => item.id === image.id ? { ...item, savedPath, downloadError: undefined } : item)
-          .filter((item) => !(item.id === image.id && downloadPreferences.removeAfterDownload)));
+        if (downloadPreferences.removeAfterDownload) {
+          removeDownloadedImages([image.id]);
+        } else {
+          updateImages((current) => current.map((item) =>
+            item.id === image.id ? { ...item, savedPath, downloadError: undefined } : item
+          ));
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Não foi possível baixar a imagem compactada.";
         updateImages((current) =>
@@ -557,7 +638,7 @@ export function ImageCompressorApp() {
         );
       }
     }
-  }, [downloadPreferences, updateImages]);
+  }, [downloadPreferences, removeDownloadedImages, updateImages]);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -586,6 +667,51 @@ export function ImageCompressorApp() {
       });
     });
   }, [downloadImage, downloadPreferences.autoDownload, downloadPreferences.mode, images, isDesktop]);
+
+  useEffect(() => {
+    if (
+      isDesktop ||
+      isProcessing ||
+      downloadPreferences.mode !== "same-folder" ||
+      !downloadPreferences.autoDownload
+    ) {
+      return;
+    }
+
+    const hasUnfinishedImages = images.some((image) => image.status === "pending" || image.status === "processing");
+    if (hasUnfinishedImages) {
+      return;
+    }
+
+    const readyImages = images.filter(
+      (image) =>
+        image.status === "done" &&
+        image.compressedBlob &&
+        image.compressedName &&
+        !autoDownloadAttemptedRef.current.has(image.id)
+    );
+    if (!readyImages.length) {
+      return;
+    }
+
+    readyImages.forEach((image) => autoDownloadAttemptedRef.current.add(image.id));
+    const readyIds = readyImages.map((image) => image.id);
+    void downloadImagesZip(readyImages, {
+      subfolderName: downloadPreferences.saveInSubfolder
+        ? normalizeSubfolderName(downloadPreferences.subfolderName)
+        : undefined
+    }).then((started) => {
+      if (started && downloadPreferences.removeAfterDownload) {
+        removeDownloadedImages(readyIds);
+      }
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "Não foi possível baixar o ZIP automaticamente.";
+      const readyIdSet = new Set(readyIds);
+      updateImages((current) => current.map((image) =>
+        readyIdSet.has(image.id) ? { ...image, downloadError: message } : image
+      ));
+    });
+  }, [downloadPreferences, images, isDesktop, isProcessing, removeDownloadedImages, updateImages]);
 
   useEffect(() => {
     const hasUnfinishedImages = images.some((image) => image.status === "pending" || image.status === "processing");
@@ -630,32 +756,60 @@ export function ImageCompressorApp() {
   }, []);
 
   return (
-    <main className="min-h-screen">
-      <header className="border-b bg-card/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 lg:px-6">
+    <main className={cn("min-h-screen", variant === "beta" && "bg-[#f6f8fb]")}>
+      <header className={cn("sticky top-0 z-30 border-b bg-card/90 backdrop-blur-xl", variant === "beta" && "border-slate-200 bg-white/90")}>
+        <div className={cn("mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 lg:px-6", variant === "beta" && "py-2.5")}>
           <div className="flex items-center gap-3">
             <img
-              src="./icon.png"
+              src="/icon.png"
               alt=""
-              width={40}
-              height={40}
-              className="h-10 w-10 rounded-xl shadow-sm shadow-primary/25"
+              width={variant === "beta" ? 34 : 40}
+              height={variant === "beta" ? 34 : 40}
+              className={cn("rounded-xl shadow-sm shadow-primary/25", variant === "beta" ? "h-[34px] w-[34px]" : "h-10 w-10")}
             />
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Compact Img</h1>
-              <p className="hidden text-xs text-muted-foreground sm:block">Imagens menores, sem perder o controle.</p>
+              <h1 className={cn("font-bold tracking-tight", variant === "beta" ? "text-base" : "text-lg")}>Compact Img</h1>
+              {variant === "current" ? <p className="hidden text-xs text-muted-foreground sm:block">Imagens menores, sem perder o controle.</p> : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsAboutOpen(true)}>
-              <Info className="h-4 w-4" />
-              <span>Sobre</span>
-            </Button>
-            <div className="flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1.5 text-xs font-medium text-muted-foreground">
-              <LockKeyhole className="h-3.5 w-3.5 text-secondary" />
-              <span className="hidden sm:inline">Processamento 100% local</span>
-              <span className="sm:hidden">100% local</span>
-            </div>
+            <nav aria-label="Versão da interface" className="flex items-center rounded-lg border bg-background p-1">
+              <Link
+                href="/"
+                aria-current={variant === "current" ? "page" : undefined}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  variant === "current" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                Atual
+              </Link>
+              <Link
+                href="/beta/"
+                aria-current={variant === "beta" ? "page" : undefined}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  variant === "beta" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                Beta
+              </Link>
+            </nav>
+            {variant === "current" ? (
+              <>
+                <Button variant="outline" size="icon" className="sm:hidden" aria-label="Sobre o Compact Img" onClick={() => setIsAboutOpen(true)}>
+                  <Info className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={() => setIsAboutOpen(true)}>
+                  <Info className="h-4 w-4" />
+                  <span>Sobre</span>
+                </Button>
+                <div className="hidden items-center gap-2 rounded-full border bg-background/70 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:flex">
+                  <LockKeyhole className="h-3.5 w-3.5 text-secondary" />
+                  <span>Processamento 100% local</span>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       </header>
@@ -691,7 +845,7 @@ export function ImageCompressorApp() {
                 <div className="grid gap-3 border-t px-4 py-3 text-xs leading-relaxed text-muted-foreground">
                   <div>
                     <p className="font-semibold text-foreground">Novidades</p>
-                    <p className="mt-1">A fila ficou no topo, o painel de arquivos foi para a lateral e os downloads ganharam opções de destino, subpasta e limpeza automática.</p>
+                    <p className="mt-1">O envio e a fila compartilham a área principal; as configurações ficam na lateral e as opções avançadas podem ser recolhidas.</p>
                   </div>
                   <div>
                     <p className="font-semibold text-foreground">Correções</p>
@@ -720,6 +874,33 @@ export function ImageCompressorApp() {
         </DialogContent>
       </Dialog>
 
+      {variant === "beta" ? (
+        <BetaImageWorkspace
+          settings={settings}
+          onSettingsChange={handleSettingsChange}
+          downloadPreferences={downloadPreferences}
+          onDownloadPreferencesChange={handleDownloadPreferencesChange}
+          images={deferredImages}
+          selectedImage={selectedImage}
+          lastBatchSummary={lastQueueSummary}
+          isProcessing={isProcessing}
+          isCancelRequested={isCancelRequested}
+          isDesktop={isDesktop}
+          processedCount={processedCount}
+          progress={progress}
+          invalidFiles={invalidFiles}
+          onInvalidFiles={setInvalidFiles}
+          onFiles={addFiles}
+          onSelect={setSelectedId}
+          onRemove={removeImage}
+          onProcess={processBatch}
+          onCancelProcess={cancelProcessing}
+          onClear={clearAll}
+          onDownload={downloadImage}
+          onDownloadAllDesktop={downloadAllDesktop}
+          onDownloadAllWeb={downloadAllWeb}
+        />
+      ) : (
       <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="grid min-w-0 gap-5 animate-enter-delayed">
@@ -729,32 +910,45 @@ export function ImageCompressorApp() {
               </div>
             ) : null}
 
-            <ImageQueue
-              images={deferredImages}
-              lastBatchSummary={lastQueueSummary}
-              selectedId={selectedImage?.id}
-              isProcessing={isProcessing}
-              isDesktop={isDesktop}
-              progress={progress}
-              processedCount={processedCount}
-              onSelect={setSelectedId}
-              onRemove={removeImage}
-              onProcess={processBatch}
-              onCancelProcess={cancelProcessing}
-              onClear={clearAll}
-              onDownload={downloadImage}
-              onDownloadAllDesktop={downloadAllDesktop}
-              isCancelRequested={isCancelRequested}
-            />
+            {images.length === 0 && !lastQueueSummary ? (
+              <ImageDropzone
+                onFiles={addFiles}
+                onInvalidFiles={setInvalidFiles}
+                isDesktop={isDesktop}
+                compact
+              />
+            ) : (
+              <ImageQueue
+                images={deferredImages}
+                lastBatchSummary={lastQueueSummary}
+                selectedId={selectedImage?.id}
+                isProcessing={isProcessing}
+                isDesktop={isDesktop}
+                progress={progress}
+                processedCount={processedCount}
+                onSelect={setSelectedId}
+                onRemove={removeImage}
+                onProcess={processBatch}
+                onCancelProcess={cancelProcessing}
+                onClear={clearAll}
+                onDownload={downloadImage}
+                onDownloadAllDesktop={downloadAllDesktop}
+                onDownloadAllWeb={downloadAllWeb}
+                addImagesControl={
+                  <ImageDropzone
+                    onFiles={addFiles}
+                    onInvalidFiles={setInvalidFiles}
+                    isDesktop={isDesktop}
+                    mode="button"
+                    disabled={isProcessing}
+                  />
+                }
+                isCancelRequested={isCancelRequested}
+              />
+            )}
           </div>
 
           <aside className="grid gap-4 lg:sticky lg:top-5">
-            <ImageDropzone
-              onFiles={addFiles}
-              onInvalidFiles={setInvalidFiles}
-              isDesktop={isDesktop}
-              compact
-            />
             <CompressionSettingsPanel
               settings={settings}
               onChange={handleSettingsChange}
@@ -766,6 +960,7 @@ export function ImageCompressorApp() {
           </aside>
         </div>
       </div>
+      )}
     </main>
   );
 }

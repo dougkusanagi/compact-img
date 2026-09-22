@@ -3,7 +3,7 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "export",
-  assetPrefix: "./",
+  trailingSlash: true,
   outputFileTracingRoot: path.join(__dirname)
 };
 
