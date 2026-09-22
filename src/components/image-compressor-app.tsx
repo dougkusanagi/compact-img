@@ -1,11 +1,13 @@
 "use client";
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { LockKeyhole } from "lucide-react";
+import { Info, LockKeyhole, ChevronDown } from "lucide-react";
 import type {
   CompressionSettings,
+  DownloadPreferences,
   DownloadMode,
   QueueImage,
+  QueueSummary,
   SelectedImage,
   WorkerRequest,
   WorkerResponse
@@ -14,28 +16,45 @@ import { createImageId, isAcceptedImage, readImageDimensions } from "@/lib/image
 import {
   chooseDirectory,
   chooseSavePath,
+  buildSubfolderDestinationPath,
   compressNativeJpeg,
+  normalizeSubfolderName,
   isDesktopApp,
   joinPath,
   saveCompressedImage
 } from "@/lib/desktop";
-import { replaceExtension } from "@/lib/utils";
+import { getReduction, replaceExtension } from "@/lib/utils";
 import { CompressionSettings as CompressionSettingsPanel } from "@/components/compression-settings";
 import { ImageDropzone } from "@/components/image-dropzone";
 import { ImageQueue } from "@/components/image-queue";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 const DEFAULT_SETTINGS: CompressionSettings = {
-  preserveOriginalDimensions: true,
-  maxWidth: 1920,
-  maxHeight: 1080,
-  quality: 78,
+  preserveOriginalDimensions: false,
+  maxWidth: 2000,
+  maxHeight: 2000,
+  // A interface usa porcentagem; os encoders web recebem 80 / 100 = 0.8.
+  quality: 80,
   outputFormat: "webp",
   jpegCompressionMode: "balanced",
   keepAspectRatio: true,
   stripMetadata: true
 };
 const DEFAULT_DOWNLOAD_MODE: DownloadMode = "same-folder";
+const DEFAULT_DOWNLOAD_PREFERENCES: DownloadPreferences = {
+  mode: DEFAULT_DOWNLOAD_MODE,
+  autoDownload: false,
+  removeAfterDownload: false,
+  saveInSubfolder: false,
+  subfolderName: ""
+};
 const WORKER_TIMEOUT_MS = 30000;
+
+type BatchSummaryAccumulator = QueueSummary & {
+  reductionTotal: number;
+  reductionCount: number;
+};
 
 class CompressionTimeoutError extends Error {
   constructor() {
@@ -157,9 +176,15 @@ export function ImageCompressorApp() {
   const [isCancelRequested, setIsCancelRequested] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [downloadMode, setDownloadMode] = useState<DownloadMode>(DEFAULT_DOWNLOAD_MODE);
+  const [downloadPreferences, setDownloadPreferences] = useState<DownloadPreferences>(DEFAULT_DOWNLOAD_PREFERENCES);
+  const [lastQueueSummary, setLastQueueSummary] = useState<QueueSummary>();
+  const [autoDownloadSettled, setAutoDownloadSettled] = useState(0);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const imagesRef = useRef<QueueImage[]>([]);
   const cancelRequestedRef = useRef(false);
+  const autoDownloadAttemptedRef = useRef<Set<string>>(new Set());
+  const autoDownloadInFlightRef = useRef<Set<string>>(new Set());
+  const batchSummaryRef = useRef<BatchSummaryAccumulator | null>(null);
   const deferredImages = useDeferredValue(images);
 
   const updateImages = useCallback((updater: (current: QueueImage[]) => QueueImage[]) => {
@@ -184,15 +209,19 @@ export function ImageCompressorApp() {
       }
     }
 
-    const savedDownloadMode = localStorage.getItem("compact-img-download-mode");
-    if (savedDownloadMode === "same-folder" || savedDownloadMode === "choose-location") {
-      setDownloadMode(savedDownloadMode);
+    const savedDownloadPreferences = localStorage.getItem("compact-img-download-preferences");
+    if (savedDownloadPreferences) {
+      try {
+        setDownloadPreferences({ ...DEFAULT_DOWNLOAD_PREFERENCES, ...JSON.parse(savedDownloadPreferences) });
+      } catch (e) {
+        console.error("Erro ao carregar preferencias de download:", e);
+      }
     }
   }, []);
 
-  const handleDownloadModeChange = useCallback((mode: DownloadMode) => {
-    setDownloadMode(mode);
-    localStorage.setItem("compact-img-download-mode", mode);
+  const handleDownloadPreferencesChange = useCallback((preferences: DownloadPreferences) => {
+    setDownloadPreferences(preferences);
+    localStorage.setItem("compact-img-download-preferences", JSON.stringify(preferences));
   }, []);
 
   const selectedImage = useMemo(
@@ -225,6 +254,7 @@ export function ImageCompressorApp() {
     }
 
     updateImages((current) => [...current, ...nextImages]);
+    setLastQueueSummary(undefined);
     setSelectedId((current) => current ?? nextImages[0].id);
 
     nextImages.forEach((image) => {
@@ -262,6 +292,7 @@ export function ImageCompressorApp() {
       current.forEach(revokeImageUrls);
       return [];
     });
+    setLastQueueSummary(undefined);
     setSelectedId(undefined);
     setInvalidFiles([]);
     setProcessedCount(0);
@@ -273,6 +304,15 @@ export function ImageCompressorApp() {
     }
 
     cancelRequestedRef.current = false;
+    autoDownloadAttemptedRef.current.clear();
+    autoDownloadInFlightRef.current.clear();
+    batchSummaryRef.current = {
+      totalCount: images.length,
+      completedCount: 0,
+      errorCount: 0,
+      reductionTotal: 0,
+      reductionCount: 0
+    };
     setIsCancelRequested(false);
     setIsProcessing(true);
     startTransition(() => {
@@ -325,6 +365,19 @@ export function ImageCompressorApp() {
           };
         }
         const compressedName = replaceExtension(image.file.name, settings.outputFormat);
+        const batchSummary = batchSummaryRef.current;
+        if (batchSummary) {
+          if (result.error || !result.blob) {
+            batchSummary.errorCount += 1;
+          } else {
+            batchSummary.completedCount += 1;
+            const reduction = getReduction(image.file.size, result.blob.size);
+            if (reduction !== undefined) {
+              batchSummary.reductionTotal += reduction;
+              batchSummary.reductionCount += 1;
+            }
+          }
+        }
 
         updateImages((current) =>
           current.map((item) => {
@@ -371,6 +424,17 @@ export function ImageCompressorApp() {
     try {
       await Promise.all(Array.from({ length: concurrency }, () => workerLoop()));
     } finally {
+      const batchSummary = batchSummaryRef.current;
+      if (batchSummary) {
+        setLastQueueSummary({
+          totalCount: batchSummary.totalCount,
+          completedCount: batchSummary.completedCount,
+          errorCount: batchSummary.errorCount,
+          averageReduction: batchSummary.reductionCount
+            ? batchSummary.reductionTotal / batchSummary.reductionCount
+            : undefined
+        });
+      }
       cancelRequestedRef.current = false;
       setIsCancelRequested(false);
       setIsProcessing(false);
@@ -386,15 +450,24 @@ export function ImageCompressorApp() {
     setIsCancelRequested(true);
   }, [isProcessing]);
 
-  const downloadImage = useCallback(async (id: string) => {
+  const downloadImage = useCallback(async (id: string, options?: { deferRemoval?: boolean }) => {
     const image = imagesRef.current.find((item) => item.id === id);
     if (!image?.compressedBlob || !image.compressedName || !isDesktop) {
       return;
     }
 
     try {
-      const mustChooseLocation = downloadMode === "choose-location" || !image.sourcePath;
-      const destinationPath = mustChooseLocation ? await chooseSavePath(image.sourcePath, image.compressedName) : undefined;
+      const mustChooseLocation = downloadPreferences.mode === "choose-location" || !image.sourcePath;
+      let destinationPath: string | undefined;
+      if (mustChooseLocation) {
+        destinationPath = (await chooseSavePath(image.sourcePath, image.compressedName)) ?? undefined;
+      } else if (downloadPreferences.saveInSubfolder && image.sourcePath) {
+        destinationPath = buildSubfolderDestinationPath(
+          image.sourcePath,
+          normalizeSubfolderName(downloadPreferences.subfolderName),
+          image.compressedName
+        );
+      }
 
       if (mustChooseLocation && !destinationPath) {
         return;
@@ -407,13 +480,9 @@ export function ImageCompressorApp() {
         destinationPath: destinationPath ?? undefined
       });
 
-      updateImages((current) =>
-        current.map((item) =>
-          item.id === id
-            ? { ...item, savedPath, downloadError: undefined }
-            : item
-        )
-      );
+      updateImages((current) => current
+        .map((item) => item.id === id ? { ...item, savedPath, downloadError: undefined } : item)
+        .filter((item) => !(item.id === id && downloadPreferences.removeAfterDownload && !options?.deferRemoval)));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nao foi possivel baixar a imagem compactada.";
       updateImages((current) =>
@@ -424,7 +493,7 @@ export function ImageCompressorApp() {
         )
       );
     }
-  }, [downloadMode, isDesktop, updateImages]);
+  }, [downloadPreferences, isDesktop, updateImages]);
 
   const downloadAllDesktop = useCallback(async () => {
     const readyImages = imagesRef.current.filter(
@@ -437,7 +506,7 @@ export function ImageCompressorApp() {
 
     let batchDirectory: string | null = null;
 
-    if (downloadMode === "choose-location") {
+    if (downloadPreferences.mode === "choose-location") {
       batchDirectory = await chooseDirectory();
       if (!batchDirectory) {
         return; // Usuário cancelou a seleção da pasta
@@ -462,6 +531,12 @@ export function ImageCompressorApp() {
               continue;
             }
             destinationPath = chosen;
+          } else if (downloadPreferences.saveInSubfolder) {
+            destinationPath = buildSubfolderDestinationPath(
+              image.sourcePath,
+              normalizeSubfolderName(downloadPreferences.subfolderName),
+              image.compressedName
+            );
           }
         }
 
@@ -472,11 +547,9 @@ export function ImageCompressorApp() {
           destinationPath
         });
 
-        updateImages((current) =>
-          current.map((item) =>
-            item.id === image.id ? { ...item, savedPath, downloadError: undefined } : item
-          )
-        );
+        updateImages((current) => current
+          .map((item) => item.id === image.id ? { ...item, savedPath, downloadError: undefined } : item)
+          .filter((item) => !(item.id === image.id && downloadPreferences.removeAfterDownload)));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Não foi possível baixar a imagem compactada.";
         updateImages((current) =>
@@ -484,11 +557,71 @@ export function ImageCompressorApp() {
         );
       }
     }
-  }, [downloadMode, updateImages]);
+  }, [downloadPreferences, updateImages]);
 
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
+
+  useEffect(() => {
+    if (!isDesktop || downloadPreferences.mode !== "same-folder" || !downloadPreferences.autoDownload) {
+      return;
+    }
+
+    const readyImages = images.filter(
+      (image) =>
+        image.status === "done" &&
+        image.compressedBlob &&
+        image.compressedName &&
+        !image.savedPath &&
+        !autoDownloadAttemptedRef.current.has(image.id)
+    );
+
+    readyImages.forEach((image) => {
+      autoDownloadAttemptedRef.current.add(image.id);
+      autoDownloadInFlightRef.current.add(image.id);
+      void downloadImage(image.id, { deferRemoval: true }).finally(() => {
+        autoDownloadInFlightRef.current.delete(image.id);
+        setAutoDownloadSettled((value) => value + 1);
+      });
+    });
+  }, [downloadImage, downloadPreferences.autoDownload, downloadPreferences.mode, images, isDesktop]);
+
+  useEffect(() => {
+    const hasUnfinishedImages = images.some((image) => image.status === "pending" || image.status === "processing");
+    const completedImages = images.filter((image) => image.status === "done");
+    const allCompletedImagesAttempted = completedImages.every((image) =>
+      autoDownloadAttemptedRef.current.has(image.id)
+    );
+
+    if (
+      isProcessing ||
+      !isDesktop ||
+      !downloadPreferences.autoDownload ||
+      !downloadPreferences.removeAfterDownload ||
+      hasUnfinishedImages ||
+      !allCompletedImagesAttempted ||
+      autoDownloadInFlightRef.current.size > 0
+    ) {
+      return;
+    }
+
+    const savedIds = new Set(
+      images
+        .filter((image) => image.status === "done" && image.savedPath)
+        .map((image) => image.id)
+    );
+
+    if (!savedIds.size) {
+      return;
+    }
+
+    updateImages((current) => {
+      current.filter((image) => savedIds.has(image.id)).forEach(revokeImageUrls);
+      return current.filter((image) => !savedIds.has(image.id));
+    });
+    setSelectedId((current) => current && savedIds.has(current) ? undefined : current);
+  }, [autoDownloadSettled, downloadPreferences.autoDownload, downloadPreferences.removeAfterDownload, images, isDesktop, isProcessing, updateImages]);
 
   useEffect(() => {
     return () => {
@@ -513,23 +646,83 @@ export function ImageCompressorApp() {
               <p className="hidden text-xs text-muted-foreground sm:block">Imagens menores, sem perder o controle.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            <LockKeyhole className="h-3.5 w-3.5 text-secondary" />
-            <span className="hidden sm:inline">Processamento 100% local</span>
-            <span className="sm:hidden">100% local</span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsAboutOpen(true)}>
+              <Info className="h-4 w-4" />
+              <span>Sobre</span>
+            </Button>
+            <div className="flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <LockKeyhole className="h-3.5 w-3.5 text-secondary" />
+              <span className="hidden sm:inline">Processamento 100% local</span>
+              <span className="sm:hidden">100% local</span>
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="grid min-w-0 gap-5 animate-enter-delayed">
-            <ImageDropzone
-              onFiles={addFiles}
-              onInvalidFiles={setInvalidFiles}
-              isDesktop={isDesktop}
-            />
+      <Dialog open={isAboutOpen} onOpenChange={setIsAboutOpen}>
+        <DialogContent className="max-w-2xl">
+          <div className="pr-8">
+            <DialogTitle>Sobre o Compact Img</DialogTitle>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Compact Img é um compactador de imagens em lote que processa tudo localmente no seu dispositivo.
+              Seus arquivos não são enviados para nenhum servidor.
+            </p>
+          </div>
 
+          <div className="grid gap-3 rounded-lg border bg-muted/35 p-4 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-medium">Versão atual</span>
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">0.1.1</span>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Compare resultados, ajuste a qualidade e escolha como organizar seus arquivos compactados.
+            </p>
+          </div>
+
+          <section className="grid gap-3">
+            <h4 className="text-sm font-semibold">Notas da versão</h4>
+            <div className="grid gap-2">
+              <details open className="group rounded-lg border bg-card">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                  <span>0.1.1 · Organização e controles de download</span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="grid gap-3 border-t px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+                  <div>
+                    <p className="font-semibold text-foreground">Novidades</p>
+                    <p className="mt-1">A fila ficou no topo, o painel de arquivos foi para a lateral e os downloads ganharam opções de destino, subpasta e limpeza automática.</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Correções</p>
+                    <p className="mt-1">Melhorias de espaçamento, estados dos botões e organização das configurações.</p>
+                  </div>
+                </div>
+              </details>
+              <details className="group rounded-lg border bg-card">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+                  <span>0.1.0 · Primeira versão</span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="grid gap-3 border-t px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+                  <div>
+                    <p className="font-semibold text-foreground">Novidades</p>
+                    <p className="mt-1">Compactação local em lote, pré-visualização antes e depois, formatos JPG, PNG, WEBP e AVIF e processamento por fila.</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Correções</p>
+                    <p className="mt-1">Versão inicial publicada com foco em processamento local e liberação segura dos previews.</p>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </section>
+        </DialogContent>
+      </Dialog>
+
+      <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="grid min-w-0 gap-5 animate-enter-delayed">
             {invalidFiles.length ? (
               <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive">
                 <strong>Arquivos ignorados:</strong> {invalidFiles.join(", ")}
@@ -538,10 +731,10 @@ export function ImageCompressorApp() {
 
             <ImageQueue
               images={deferredImages}
+              lastBatchSummary={lastQueueSummary}
               selectedId={selectedImage?.id}
               isProcessing={isProcessing}
               isDesktop={isDesktop}
-              downloadMode={downloadMode}
               progress={progress}
               processedCount={processedCount}
               onSelect={setSelectedId}
@@ -551,13 +744,25 @@ export function ImageCompressorApp() {
               onClear={clearAll}
               onDownload={downloadImage}
               onDownloadAllDesktop={downloadAllDesktop}
-              onDownloadModeChange={handleDownloadModeChange}
               isCancelRequested={isCancelRequested}
             />
           </div>
 
           <aside className="grid gap-4 lg:sticky lg:top-5">
-            <CompressionSettingsPanel settings={settings} onChange={handleSettingsChange} disabled={isProcessing} />
+            <ImageDropzone
+              onFiles={addFiles}
+              onInvalidFiles={setInvalidFiles}
+              isDesktop={isDesktop}
+              compact
+            />
+            <CompressionSettingsPanel
+              settings={settings}
+              onChange={handleSettingsChange}
+              downloadPreferences={downloadPreferences}
+              onDownloadPreferencesChange={handleDownloadPreferencesChange}
+              isDesktop={isDesktop}
+              disabled={isProcessing}
+            />
           </aside>
         </div>
       </div>

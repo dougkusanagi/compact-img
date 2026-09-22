@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -12,7 +12,7 @@ import {
   ScanSearch,
   Trash2
 } from "lucide-react";
-import type { DownloadMode, QueueImage } from "@/lib/image-types";
+import type { QueueImage, QueueSummary } from "@/lib/image-types";
 import { downloadBlob } from "@/lib/download";
 import { cn, formatBytes, formatPercent, getReduction } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,12 +21,20 @@ import { BeforeAfterSlider } from "@/components/before-after-slider";
 import { DownloadActions } from "@/components/download-actions";
 import { ProgressBar } from "@/components/progress-bar";
 
+type QueueStats = {
+  completedCount: number;
+  errorCount: number;
+  hasCompressed: boolean;
+  hasProcessed: boolean;
+  averageReduction?: number;
+};
+
 type ImageQueueProps = {
   images: QueueImage[];
+  lastBatchSummary?: QueueSummary;
   selectedId?: string;
   isProcessing?: boolean;
   isDesktop?: boolean;
-  downloadMode: DownloadMode;
   progress: number;
   processedCount: number;
   onSelect: (id: string) => void;
@@ -36,7 +44,6 @@ type ImageQueueProps = {
   onClear: () => void;
   onDownload: (id: string) => void | Promise<void>;
   onDownloadAllDesktop: () => void | Promise<void>;
-  onDownloadModeChange: (mode: DownloadMode) => void;
   isCancelRequested?: boolean;
 };
 
@@ -338,10 +345,10 @@ ImageQueueItem.displayName = "ImageQueueItem";
 
 export function ImageQueue({
   images,
+  lastBatchSummary,
   selectedId,
   isProcessing = false,
   isDesktop = false,
-  downloadMode,
   progress,
   processedCount,
   onSelect,
@@ -351,11 +358,13 @@ export function ImageQueue({
   onClear,
   onDownload,
   onDownloadAllDesktop,
-  onDownloadModeChange,
   isCancelRequested = false
 }: ImageQueueProps) {
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const stats = useMemo(() => {
+  const lastStatsRef = useRef<QueueStats | null>(null);
+  const lastItemCountRef = useRef(0);
+  const previousImagesLengthRef = useRef(0);
+  const stats = useMemo<QueueStats>(() => {
     let completedCount = 0;
     let errorCount = 0;
     let reductionTotal = 0;
@@ -392,6 +401,26 @@ export function ImageQueue({
     };
   }, [images]);
 
+  // Capture the complete active batch before automatic cleanup can shrink it.
+  const hasPendingImages = images.some((image) => image.status === "pending" || image.status === "processing");
+  const startedNewBatch = previousImagesLengthRef.current === 0 && images.length > 0;
+  if (startedNewBatch || (hasPendingImages && images.length > lastItemCountRef.current)) {
+    lastItemCountRef.current = images.length;
+  }
+  if (images.length > 0 && images.length === lastItemCountRef.current) {
+    lastStatsRef.current = stats;
+  }
+  previousImagesLengthRef.current = images.length;
+
+  const lastStats = lastStatsRef.current;
+  const lastItemCount = lastItemCountRef.current;
+  const displayedSummary = lastBatchSummary ?? (lastStats ? {
+    totalCount: lastItemCount,
+    completedCount: lastStats.completedCount,
+    errorCount: lastStats.errorCount,
+    averageReduction: lastStats.averageReduction
+  } : undefined);
+
   const handleTogglePreview = useCallback((id: string) => {
     setPreviewId((current) => (current === id ? null : id));
   }, []);
@@ -406,7 +435,7 @@ export function ImageQueue({
 
   return (
     <Card className="overflow-hidden border-border/60 shadow-[0_12px_38px_rgba(0,0,0,0.04)]">
-      {images.length > 0 && (
+      {(images.length > 0 || displayedSummary) && (
         <CardHeader className="space-y-4 border-b bg-card p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-3">
@@ -414,56 +443,60 @@ export function ImageQueue({
                 <ScanSearch className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle className="text-base font-bold text-foreground">Fila de compactação</CardTitle>
+                <CardTitle className="text-base font-bold text-foreground">
+                  {images.length > 0 ? "Fila de compactação" : "Resumo do último lote"}
+                </CardTitle>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Acompanhe e compare os ganhos do lote antes de baixar.
+                  {images.length > 0
+                    ? "Acompanhe e compare os ganhos do lote antes de baixar."
+                    : "O resultado do lote concluído permanece disponível aqui."}
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 sm:self-start">
               <span className="rounded-full bg-muted/70 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                {images.length} {images.length === 1 ? "item" : "itens"}
+                {images.length > 0 ? images.length : displayedSummary?.totalCount ?? 0} {(images.length > 0 ? images.length : displayedSummary?.totalCount) === 1 ? "item" : "itens"}
               </span>
-              {stats.completedCount > 0 && (
+              {(displayedSummary?.completedCount ?? stats.completedCount) > 0 && (
                 <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  {stats.completedCount} concluídas
+                  {displayedSummary?.completedCount ?? stats.completedCount} concluídas
                 </span>
               )}
-              {stats.errorCount > 0 && (
+              {(displayedSummary?.errorCount ?? stats.errorCount) > 0 && (
                 <span className="rounded-full bg-destructive/10 px-2.5 py-0.5 text-xs font-semibold text-destructive">
-                  {stats.errorCount} com erro
+                  {displayedSummary?.errorCount ?? stats.errorCount} com erro
                 </span>
               )}
             </div>
           </div>
 
           <div className="grid gap-3 grid-cols-3 border-t border-border/40 pt-4">
-            <MetricBadge label="Na fila" value={String(images.length)} />
-            <MetricBadge label="Concluídas" value={String(stats.completedCount)} />
+            <MetricBadge label="Na fila" value={String(images.length > 0 ? images.length : displayedSummary?.totalCount ?? 0)} />
+            <MetricBadge label="Concluídas" value={String(displayedSummary?.completedCount ?? stats.completedCount)} />
             <MetricBadge
               label="Redução Média"
-              value={stats.averageReduction !== undefined ? formatPercent(stats.averageReduction) : "--"}
+              value={displayedSummary?.averageReduction !== undefined ? formatPercent(displayedSummary.averageReduction) : "--"}
               tone="success"
             />
           </div>
 
-          <div className="border-t border-border/40 pt-3 flex w-full">
-            <DownloadActions
-              images={images}
-              isProcessing={isProcessing}
-              isDesktop={isDesktop}
-              downloadMode={downloadMode}
-              hasCompressed={stats.hasCompressed}
-              hasProcessed={stats.hasProcessed}
-              onProcess={onProcess}
-              onCancelProcess={onCancelProcess}
-              onClear={onClear}
-              onDownloadAllDesktop={onDownloadAllDesktop}
-              onDownloadModeChange={onDownloadModeChange}
-              isCancelRequested={isCancelRequested}
-              compact
-            />
-          </div>
+          {images.length > 0 ? (
+            <div className="border-t border-border/40 pt-3 flex w-full">
+              <DownloadActions
+                images={images}
+                isProcessing={isProcessing}
+                isDesktop={isDesktop}
+                hasCompressed={stats.hasCompressed}
+                hasProcessed={stats.hasProcessed}
+                onProcess={onProcess}
+                onCancelProcess={onCancelProcess}
+                onClear={onClear}
+                onDownloadAllDesktop={onDownloadAllDesktop}
+                isCancelRequested={isCancelRequested}
+                compact
+              />
+            </div>
+          ) : null}
         </CardHeader>
       )}
 
@@ -479,9 +512,13 @@ export function ImageQueue({
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground/85">
               <FolderDown className="h-5 w-5" />
             </div>
-            <p className="text-sm font-semibold text-foreground">Nenhuma imagem adicionada</p>
+            <p className="text-sm font-semibold text-foreground">
+              {displayedSummary ? "Fila concluída" : "Nenhuma imagem adicionada"}
+            </p>
             <p className="mt-1 max-w-xs text-xs leading-relaxed text-muted-foreground">
-              Adicione arquivos acima para acompanhar o status, comparar visualmente e baixar os resultados.
+              {displayedSummary
+                ? "Adicione novas imagens acima para iniciar outro lote."
+                : "Adicione arquivos acima para acompanhar o status, comparar visualmente e baixar os resultados."}
             </p>
           </div>
         ) : (

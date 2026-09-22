@@ -23,6 +23,11 @@ bun run dev
 
 Abra `http://localhost:3000`.
 
+Este projeto usa Next.js, não Vite. Não execute `vp dev`: esse comando inicia
+o servidor Vite+ genérico e pode abrir outra porta sem servir esta aplicação.
+Se estiver usando VITE+, `vpr dev` também pode executar o script do projeto;
+`bun run dev` é o comando recomendado.
+
 ## Rodando a versao desktop
 
 O Tauri inicia o servidor de desenvolvimento do Next e abre a janela nativa:

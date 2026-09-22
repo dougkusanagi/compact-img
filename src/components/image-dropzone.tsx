@@ -18,9 +18,10 @@ type ImageDropzoneProps = {
   onFiles: (files: SelectedImage[]) => void;
   onInvalidFiles: (names: string[]) => void;
   isDesktop: boolean;
+  compact?: boolean;
 };
 
-export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop }: ImageDropzoneProps) {
+export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = false }: ImageDropzoneProps) {
   const [isNativeDragActive, setIsNativeDragActive] = useState(false);
   const [importingCount, setImportingCount] = useState(0);
   const isImporting = importingCount > 0;
@@ -127,7 +128,8 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop }: ImageDropz
       {...getRootProps()}
       aria-busy={isImporting}
       className={cn(
-        "subtle-grid group relative flex min-h-72 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed bg-card px-6 py-10 text-center transition-all duration-300",
+        "subtle-grid group relative flex flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed bg-card text-center transition-all duration-300",
+        compact ? "min-h-44 px-4 py-6" : "min-h-72 px-6 py-10",
         isImporting
           ? "border-primary/60 bg-primary/[0.04] shadow-md shadow-primary/10"
           : dragActive
@@ -138,7 +140,7 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop }: ImageDropz
       <input {...getInputProps()} />
       <div
         className={cn(
-          "mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300",
+        compact ? "mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300" : "mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300",
           isImporting ? "scale-105" : dragActive ? "scale-110 rotate-3" : "group-hover:-translate-y-1"
         )}
       >
@@ -150,14 +152,14 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop }: ImageDropz
           <UploadCloud className="h-8 w-8" />
         )}
       </div>
-      <h2 className="text-xl font-bold tracking-tight">
+      <h2 className={cn("font-bold tracking-tight", compact ? "text-base" : "text-xl")}>
         {isImporting
           ? `Carregando ${importingCount} ${importingCount === 1 ? "imagem" : "imagens"}...`
           : dragActive
             ? "Pode soltar suas imagens"
             : "Arraste imagens para começar"}
       </h2>
-      <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
+      <p className={cn("mt-2 max-w-lg leading-relaxed text-muted-foreground", compact ? "text-xs" : "text-sm")}>
         {isImporting
           ? "Preparando os arquivos para exibir na lista. Isso pode levar alguns segundos."
           : isDesktop
@@ -168,12 +170,12 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop }: ImageDropz
         type="button"
         onClick={chooseFiles}
         disabled={isImporting}
-        className="mt-6 inline-flex h-11 items-center gap-2 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+        className={cn("inline-flex items-center gap-2 rounded-md bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60", compact ? "mt-4 h-9 px-4 text-xs" : "mt-6 h-11 px-5 text-sm")}
       >
         {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <MousePointerClick className="h-4 w-4" />}
         {isImporting ? "Carregando..." : "Escolher arquivos"}
       </button>
-      <div className="mt-5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+      <div className={cn("flex items-center gap-2 text-xs font-medium text-muted-foreground", compact ? "mt-3" : "mt-5")}>
         <FileImage className="h-3.5 w-3.5" />
         JPG, PNG, WEBP e AVIF
       </div>
