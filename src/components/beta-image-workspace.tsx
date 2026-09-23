@@ -70,6 +70,64 @@ const FORMAT_OPTIONS: { value: OutputFormat; label: string }[] = [
   { value: "avif", label: "AVIF" }
 ];
 
+const SIZE_PRESET_OPTIONS = [
+  { value: "original", label: "Original" },
+  { value: "web", label: "Web" },
+  { value: "hd", label: "Full HD" },
+  { value: "4k", label: "4K" }
+] as const;
+
+const JPEG_MODE_OPTIONS = [
+  { value: "fast", label: "Rápida" },
+  { value: "balanced", label: "Balanceada" },
+  { value: "max", label: "Compressão máxima" }
+] as const;
+
+function SegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+  disabled,
+  columns,
+  ariaLabel,
+  ariaLabelledBy
+}: {
+  options: readonly { value: T; label: string }[];
+  value: string;
+  onChange: (value: T) => void;
+  disabled?: boolean;
+  columns: 3 | 4;
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
+}) {
+  return (
+    <div
+      className={cn("grid gap-1 rounded-xl bg-slate-100 p-1", columns === 3 ? "grid-cols-3" : "grid-cols-4")}
+      role="group"
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+    >
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          disabled={disabled}
+          onClick={() => onChange(option.value)}
+          className={cn(
+            "h-9 rounded-lg text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50",
+            value === option.value
+              ? "bg-white text-blue-700 shadow-sm"
+              : "text-slate-500 hover:text-slate-900"
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function SettingField({
   label,
   children,
@@ -89,11 +147,11 @@ function SettingField({
     <div className={cn("grid gap-2", className)}>
       <div className="flex min-h-5 items-center justify-between gap-2">
         {htmlFor ? (
-          <Label htmlFor={htmlFor} className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <Label htmlFor={htmlFor} className="text-xs font-semibold text-slate-500">
             {label}
           </Label>
         ) : (
-          <span id={labelId} className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <span id={labelId} className="text-xs font-semibold text-slate-500">
             {label}
           </span>
         )}
@@ -172,24 +230,14 @@ function OutputSettings({
       <div className="grid gap-5 p-5">
         <fieldset className="m-0 min-w-0 border-0 p-0" aria-labelledby="beta-format-label" disabled={disabled}>
           <SettingField label="Formato" labelId="beta-format-label">
-            <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1">
-            {FORMAT_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={settings.outputFormat === option.value}
-                onClick={() => update("outputFormat", option.value)}
-                className={cn(
-                  "h-9 rounded-lg text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-                  settings.outputFormat === option.value
-                    ? "bg-white text-blue-700 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900"
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-            </div>
+            <SegmentedControl
+              options={FORMAT_OPTIONS}
+              value={settings.outputFormat}
+              onChange={(value) => update("outputFormat", value)}
+              disabled={disabled}
+              columns={4}
+              ariaLabelledBy="beta-format-label"
+            />
           </SettingField>
         </fieldset>
 
@@ -221,32 +269,16 @@ function OutputSettings({
           trailing={<Maximize2 className="h-3.5 w-3.5 text-slate-400" />}
           className="border-t border-slate-100 pt-4"
         >
-          <div className="grid grid-cols-4 gap-1.5" role="group" aria-labelledby="beta-size-label">
-            {([
-              ["original", "Original"],
-              ["web", "Web"],
-              ["hd", "Full HD"],
-              ["4k", "4K"]
-            ] as const).map(([preset, label]) => (
-              <button
-                key={preset}
-                type="button"
-                aria-pressed={activeSizePreset === preset}
-                disabled={disabled}
-                onClick={() => setSizePreset(preset)}
-                className={cn(
-                  "h-8 rounded-lg border px-1 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50",
-                  activeSizePreset === preset
-                    ? "border-blue-200 bg-blue-50 text-blue-700"
-                    : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-800"
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            options={SIZE_PRESET_OPTIONS}
+            value={activeSizePreset}
+            onChange={setSizePreset}
+            disabled={disabled}
+            columns={4}
+            ariaLabelledBy="beta-size-label"
+          />
           {!settings.preserveOriginalDimensions ? (
-            <div className="grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-end gap-1.5">
+            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-end gap-1.5">
               <SettingField label="Largura" htmlFor="beta-width">
                 <div className="relative">
                   <Input
@@ -302,18 +334,15 @@ function OutputSettings({
         </SettingField>
 
         {settings.outputFormat === "jpeg" && isDesktop ? (
-          <SettingField label="Modo JPG" htmlFor="beta-jpeg-mode" className="border-t border-slate-100 pt-4">
-            <select
-              id="beta-jpeg-mode"
+          <SettingField label="Modo JPG" labelId="beta-jpeg-mode-label" className="border-t border-slate-100 pt-4">
+            <SegmentedControl
+              options={JPEG_MODE_OPTIONS}
               value={settings.jpegCompressionMode}
+              onChange={(value) => update("jpegCompressionMode", value)}
               disabled={disabled}
-              onChange={(event) => update("jpegCompressionMode", event.target.value as CompressionSettings["jpegCompressionMode"])}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              <option value="fast">Rápida</option>
-              <option value="balanced">Balanceada</option>
-              <option value="max">Compressão máxima</option>
-            </select>
+              columns={3}
+              ariaLabelledBy="beta-jpeg-mode-label"
+            />
           </SettingField>
         ) : null}
 
@@ -324,15 +353,13 @@ function OutputSettings({
           </summary>
           <div className="grid gap-4 pt-4">
             {isDesktop && settings.outputFormat === "jpeg" ? (
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="beta-metadata" className="text-xs text-slate-600">Remover metadados</Label>
-                <Switch
-                  id="beta-metadata"
-                  checked={settings.stripMetadata}
-                  disabled={disabled}
-                  onCheckedChange={(checked) => update("stripMetadata", checked)}
-                />
-              </div>
+              <PreferenceToggle
+                id="beta-metadata"
+                label="Remover metadados"
+                checked={settings.stripMetadata}
+                disabled={disabled}
+                onCheckedChange={(checked) => update("stripMetadata", checked)}
+              />
             ) : null}
             <SettingField label="Destino do download" htmlFor="beta-download-mode">
               <select
@@ -363,15 +390,20 @@ function OutputSettings({
                   onCheckedChange={(checked) => updateDownload("removeAfterDownload", checked)}
                 />
                 <div className="grid gap-2 rounded-lg bg-slate-50 p-3">
-                  <PreferenceToggle
-                    id="beta-subfolder"
-                    label="Salvar em subpasta"
-                    checked={downloadPreferences.saveInSubfolder}
-                    disabled={disabled}
-                    onCheckedChange={(checked) => updateDownload("saveInSubfolder", checked)}
-                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="beta-subfolder" className="text-xs font-medium leading-snug text-slate-600">
+                      Salvar em subpasta
+                    </Label>
+                    <Switch
+                      id="beta-subfolder"
+                      checked={downloadPreferences.saveInSubfolder}
+                      disabled={disabled}
+                      onCheckedChange={(checked) => updateDownload("saveInSubfolder", checked)}
+                    />
+                  </div>
                   {downloadPreferences.saveInSubfolder ? (
                     <Input
+                      id="beta-subfolder-name"
                       value={downloadPreferences.subfolderName}
                       placeholder="imagens-compactadas"
                       disabled={disabled}
@@ -671,15 +703,45 @@ export function BetaImageWorkspace(props: BetaImageWorkspaceProps) {
         ) : null}
 
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-5">
-          <section className="min-w-0">
-            {selectedImage ? (
-              <ImagePreview key={selectedImage.id} image={selectedImage} />
-            ) : lastBatchSummary ? (
-              <CompletedBatch summary={lastBatchSummary} onFiles={onFiles} onInvalidFiles={onInvalidFiles} onClear={onClear} isDesktop={isDesktop} />
-            ) : (
-              <ImageDropzone onFiles={onFiles} onInvalidFiles={onInvalidFiles} isDesktop={isDesktop} compact />
-            )}
-          </section>
+          <div className="min-w-0">
+            {selectedImage || lastBatchSummary || !images.length ? (
+              <section className="min-w-0">
+                {selectedImage ? (
+                  <ImagePreview key={selectedImage.id} image={selectedImage} />
+                ) : lastBatchSummary ? (
+                  <CompletedBatch summary={lastBatchSummary} onFiles={onFiles} onInvalidFiles={onInvalidFiles} onClear={onClear} isDesktop={isDesktop} />
+                ) : (
+                  <ImageDropzone
+                    onFiles={onFiles}
+                    onInvalidFiles={onInvalidFiles}
+                    isDesktop={isDesktop}
+                    compact
+                    enableNativeDragDrop={false}
+                    enableLocalDragDrop={false}
+                  />
+                )}
+              </section>
+            ) : null}
+
+            {images.length ? (
+              <div className={cn((selectedImage || lastBatchSummary) && "mt-4")}>
+                <QueuePanel
+                  images={images}
+                  selectedId={selectedImage?.id}
+                  isProcessing={isProcessing}
+                  isDesktop={isDesktop}
+                  processedCount={processedCount}
+                  progress={progress}
+                  onSelect={onSelect}
+                  onRemove={onRemove}
+                  onDownload={onDownload}
+                  onFiles={onFiles}
+                  onInvalidFiles={onInvalidFiles}
+                  onClear={onClear}
+                />
+              </div>
+            ) : null}
+          </div>
 
           <aside className="xl:sticky xl:top-4">
             <div className="mb-4 grid gap-2">
@@ -721,23 +783,14 @@ export function BetaImageWorkspace(props: BetaImageWorkspaceProps) {
             />
           </aside>
 
-          {images.length ? (
-            <QueuePanel
-              images={images}
-              selectedId={selectedImage?.id}
-              isProcessing={isProcessing}
-              isDesktop={isDesktop}
-              processedCount={processedCount}
-              progress={progress}
-              onSelect={onSelect}
-              onRemove={onRemove}
-              onDownload={onDownload}
-              onFiles={onFiles}
-              onInvalidFiles={onInvalidFiles}
-              onClear={onClear}
-            />
-          ) : null}
         </div>
+        <ImageDropzone
+          onFiles={onFiles}
+          onInvalidFiles={onInvalidFiles}
+          isDesktop={isDesktop}
+          mode="overlay"
+          disabled={isProcessing}
+        />
         <div className="sr-only" aria-live="polite">{isComplete ? "Compactação concluída" : isProcessing ? `Processando ${processedCount} de ${images.length}` : ""}</div>
       </div>
     </main>

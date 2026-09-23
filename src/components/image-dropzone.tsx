@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ImagePlus, LoaderCircle, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ACCEPTED_IMAGE_TYPES } from "@/lib/image-utils";
+import { ACCEPTED_IMAGE_TYPES, isAcceptedImage } from "@/lib/image-utils";
 import {
   isAcceptedImagePath,
   isDesktopApp,
@@ -19,17 +19,34 @@ type ImageDropzoneProps = {
   onInvalidFiles: (names: string[]) => void;
   isDesktop: boolean;
   compact?: boolean;
-  mode?: "dropzone" | "button";
+  mode?: "dropzone" | "button" | "overlay";
   disabled?: boolean;
+  enableNativeDragDrop?: boolean;
+  enableLocalDragDrop?: boolean;
 };
 
-export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = false, mode = "dropzone", disabled = false }: ImageDropzoneProps) {
+export function ImageDropzone({
+  onFiles,
+  onInvalidFiles,
+  isDesktop,
+  compact = false,
+  mode = "dropzone",
+  disabled = false,
+  enableNativeDragDrop = true,
+  enableLocalDragDrop = true
+}: ImageDropzoneProps) {
   const [isNativeDragActive, setIsNativeDragActive] = useState(false);
+  const [isGlobalDragActive, setIsGlobalDragActive] = useState(false);
   const [importingCount, setImportingCount] = useState(0);
+  const dragDepthRef = useRef(0);
   const isImporting = importingCount > 0;
 
   const onDrop = useCallback(
     async (acceptedFiles: File[], rejectedFiles: { file: File }[]) => {
+      if (isDesktop || isDesktopApp()) {
+        return;
+      }
+
       if (rejectedFiles.length) {
         onInvalidFiles(rejectedFiles.map(({ file }) => file.name));
       }
@@ -47,11 +64,11 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
         setImportingCount(0);
       }
     },
-    [onFiles, onInvalidFiles]
+    [isDesktop, onFiles, onInvalidFiles]
   );
 
   useEffect(() => {
-    if (mode === "button" || !isDesktopApp()) {
+    if (!enableNativeDragDrop || mode === "button" || !isDesktopApp()) {
       return;
     }
 
@@ -60,7 +77,7 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
     getCurrentWebview()
       .onDragDropEvent(async ({ payload }) => {
         if (payload.type === "enter" || payload.type === "over") {
-          setIsNativeDragActive(true);
+          setIsNativeDragActive(!disabled);
           return;
         }
 
@@ -93,12 +110,118 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
       });
 
     return () => unlisten?.();
-  }, [disabled, mode, onFiles, onInvalidFiles]);
+  }, [disabled, enableNativeDragDrop, mode, onFiles, onInvalidFiles]);
+
+  useEffect(() => {
+    if (mode !== "overlay") {
+      return;
+    }
+
+    const isFileDrag = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
+    const isDesktopEnvironment = () => isDesktop || isDesktopApp();
+    const resetDragState = () => {
+      dragDepthRef.current = 0;
+      setIsGlobalDragActive(false);
+    };
+
+    const handleDragEnter = (event: DragEvent) => {
+      if (!isFileDrag(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      if (disabled || isDesktopEnvironment()) {
+        return;
+      }
+
+      dragDepthRef.current += 1;
+      setIsGlobalDragActive(true);
+    };
+
+    const handleDragOver = (event: DragEvent) => {
+      if (!isFileDrag(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      if (disabled || isDesktopEnvironment()) {
+        return;
+      }
+
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "copy";
+      }
+      setIsGlobalDragActive(true);
+    };
+
+    const handleDragLeave = (event: DragEvent) => {
+      if (!isFileDrag(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      if (disabled || isDesktopEnvironment()) {
+        return;
+      }
+
+      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+      if (dragDepthRef.current === 0) {
+        setIsGlobalDragActive(false);
+      }
+    };
+
+    const handleDrop = (event: DragEvent) => {
+      if (!isFileDrag(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      resetDragState();
+      if (disabled || isDesktopEnvironment()) {
+        return;
+      }
+
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      const acceptedFiles = files.filter(isAcceptedImage);
+      const rejectedFiles = files.filter((file) => !isAcceptedImage(file));
+
+      if (rejectedFiles.length) {
+        onInvalidFiles(rejectedFiles.map((file) => file.name));
+      }
+
+      if (!acceptedFiles.length) {
+        return;
+      }
+
+      setImportingCount(acceptedFiles.length);
+      window.requestAnimationFrame(() => {
+        try {
+          onFiles(acceptedFiles.map((file) => ({ file })));
+        } finally {
+          setImportingCount(0);
+        }
+      });
+    };
+
+    window.addEventListener("dragenter", handleDragEnter);
+    window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("dragleave", handleDragLeave);
+    window.addEventListener("drop", handleDrop);
+
+    return () => {
+      window.removeEventListener("dragenter", handleDragEnter);
+      window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("dragleave", handleDragLeave);
+      window.removeEventListener("drop", handleDrop);
+      resetDragState();
+    };
+  }, [disabled, isDesktop, mode, onFiles, onInvalidFiles]);
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     accept: ACCEPTED_IMAGE_TYPES,
     multiple: true,
     noClick: true,
+    noDrag: !enableLocalDragDrop || isDesktop,
     disabled: isImporting || disabled,
     onDrop
   });
@@ -138,6 +261,28 @@ export function ImageDropzone({ onFiles, onInvalidFiles, isDesktop, compact = fa
           {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
           {isImporting ? "Carregando..." : "Adicionar imagens"}
         </button>
+      </div>
+    );
+  }
+
+  if (mode === "overlay") {
+    if (!isGlobalDragActive && !isNativeDragActive) {
+      return null;
+    }
+
+    return (
+      <div
+        className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-6 backdrop-blur-[2px]"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="flex max-w-md flex-col items-center rounded-2xl border-2 border-dashed border-white bg-white/95 px-10 py-10 text-center shadow-2xl">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+            <UploadCloud className="h-7 w-7" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900">Solte as imagens para adicionar</h2>
+          <p className="mt-2 text-sm text-slate-500">JPG, PNG, WEBP e AVIF · Processamento local</p>
+        </div>
       </div>
     );
   }

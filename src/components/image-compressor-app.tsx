@@ -148,6 +148,12 @@ function revokeImageUrls(image: QueueImage) {
   }
 }
 
+function getImageIdentity(file: File, sourcePath?: string) {
+  return sourcePath
+    ? `path:${sourcePath}`
+    : `file:${file.name}\u0000${file.size}\u0000${file.lastModified}\u0000${file.type}`;
+}
+
 async function compressImage(
   image: QueueImage,
   settings: CompressionSettings,
@@ -236,7 +242,7 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
   }, []);
 
   const selectedImage = useMemo(
-    () => deferredImages.find((image) => image.id === selectedId) ?? deferredImages[0],
+    () => deferredImages.find((image) => image.id === selectedId),
     [deferredImages, selectedId]
   );
 
@@ -252,7 +258,16 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
       setInvalidFiles(rejected);
     }
 
-    const nextImages: QueueImage[] = validFiles.map(({ file, sourcePath }) => ({
+    const identities = new Set(imagesRef.current.map((image) => getImageIdentity(image.file, image.sourcePath)));
+    const uniqueFiles = validFiles.filter(({ file, sourcePath }) => {
+      const identity = getImageIdentity(file, sourcePath);
+      if (identities.has(identity)) {
+        return false;
+      }
+      identities.add(identity);
+      return true;
+    });
+    const nextImages: QueueImage[] = uniqueFiles.map(({ file, sourcePath }) => ({
       id: createImageId(file),
       file,
       sourcePath,
@@ -264,9 +279,9 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
       return;
     }
 
+    imagesRef.current = [...imagesRef.current, ...nextImages];
     updateImages((current) => [...current, ...nextImages]);
     setLastQueueSummary(undefined);
-    setSelectedId((current) => current ?? nextImages[0].id);
 
     nextImages.forEach((image) => {
       readImageDimensions(image.file)
@@ -288,6 +303,7 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
   }, [updateImages]);
 
   const removeImage = useCallback((id: string) => {
+    imagesRef.current = imagesRef.current.filter((image) => image.id !== id);
     updateImages((current) => {
       const image = current.find((item) => item.id === id);
       if (image) {
@@ -304,6 +320,7 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
       return;
     }
 
+    imagesRef.current = imagesRef.current.filter((image) => !idsToRemove.has(image.id));
     updateImages((current) => {
       current.filter((image) => idsToRemove.has(image.id)).forEach(revokeImageUrls);
       return current.filter((image) => !idsToRemove.has(image.id));
@@ -312,6 +329,7 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
   }, [updateImages]);
 
   const clearAll = useCallback(() => {
+    imagesRef.current = [];
     updateImages((current) => {
       current.forEach(revokeImageUrls);
       return [];
