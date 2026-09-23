@@ -37,7 +37,6 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { WorkspaceIntro } from "@/components/workspace-intro";
 
 type BetaImageWorkspaceProps = {
   settings: CompressionSettings;
@@ -639,7 +638,6 @@ export function BetaImageWorkspace(props: BetaImageWorkspaceProps) {
       <div className={cn(
         "mx-auto max-w-[1440px] animate-enter px-3 py-4 sm:px-5 sm:py-6 xl:px-8"
       )}>
-        {!images.length && !lastBatchSummary ? <WorkspaceIntro /> : null}
         {invalidFiles.length ? (
           <div role="status" className="animate-enter mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-sm shadow-rose-900/5">
             <strong>Arquivos ignorados:</strong> {invalidFiles.join(", ")}

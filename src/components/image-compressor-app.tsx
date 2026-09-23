@@ -30,7 +30,6 @@ import { CompressionSettings as CompressionSettingsPanel } from "@/components/co
 import { ImageDropzone } from "@/components/image-dropzone";
 import { ImageQueue } from "@/components/image-queue";
 import { BetaImageWorkspace } from "@/components/beta-image-workspace";
-import { WorkspaceIntro } from "@/components/workspace-intro";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
@@ -921,7 +920,6 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
         />
       ) : (
       <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
-        {!images.length && !lastQueueSummary ? <WorkspaceIntro /> : null}
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="grid min-w-0 gap-5 animate-enter-delayed">
             {invalidFiles.length ? (

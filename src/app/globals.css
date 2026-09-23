@@ -57,63 +57,6 @@
     box-shadow: inset 0 1px 2px hsl(222 45% 13% / 0.035), 0 1px 2px hsl(222 45% 13% / 0.04);
   }
 
-  .workspace-intro {
-    align-items: end;
-    display: flex;
-    gap: 2rem;
-    justify-content: space-between;
-    margin: 0 0 1.35rem;
-    padding: 0.45rem 0.2rem 0;
-  }
-
-  .workspace-eyebrow {
-    align-items: center;
-    color: hsl(221 83% 47%);
-    display: inline-flex;
-    font-size: 0.65rem;
-    font-weight: 800;
-    gap: 0.45rem;
-    letter-spacing: 0.14em;
-  }
-
-  .workspace-intro h2 {
-    color: hsl(222 45% 13%);
-    font-size: clamp(1.8rem, 3vw, 2.7rem);
-    font-weight: 760;
-    letter-spacing: -0.055em;
-    line-height: 1.12;
-    margin-top: 0.55rem;
-  }
-
-  .workspace-intro h2 span {
-    background: linear-gradient(95deg, hsl(221 83% 50%), hsl(203 91% 45%));
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .workspace-intro p {
-    color: hsl(var(--muted-foreground));
-    font-size: 0.875rem;
-    line-height: 1.6;
-    margin-top: 0.7rem;
-  }
-
-  .workspace-intro-aside {
-    align-items: flex-start;
-    color: hsl(215 16% 43%);
-    display: flex;
-    flex-direction: column;
-    font-size: 0.72rem;
-    font-weight: 600;
-    gap: 0.55rem;
-    padding: 0 2.6rem 0.25rem 0;
-    position: relative;
-  }
-
-  .workspace-intro-aside span { align-items: center; display: flex; gap: 0.6rem; white-space: nowrap; }
-  .workspace-intro-aside span svg { color: hsl(221 83% 53%); }
-  .workspace-intro-arrow { bottom: 0.15rem; color: hsl(221 83% 53%); position: absolute; right: 0; }
-
   .surface-card {
     border-color: hsl(214 28% 89%);
     border-radius: 1rem;
@@ -167,13 +110,6 @@
 
   .queue-row { transition: background-color 200ms ease, box-shadow 200ms ease; }
   .queue-row:hover { box-shadow: inset 3px 0 0 hsl(221 83% 53% / 0.45); }
-
-  @media (max-width: 700px) {
-    .workspace-intro { align-items: flex-start; flex-direction: column; gap: 0.8rem; }
-    .workspace-intro-aside { flex-direction: row; flex-wrap: wrap; gap: 0.5rem 1rem; padding-right: 0; }
-    .workspace-intro-arrow { display: none; }
-    .workspace-intro h2 { font-size: 2rem; }
-  }
 
   @media (prefers-reduced-motion: reduce) {
     .segmented-indicator { transition: none; }
@@ -271,20 +207,6 @@
     animation: drop-overlay-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  .animate-drop-card {
-    animation:
-      drop-card-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both,
-      drop-card-float 5s 560ms ease-in-out infinite;
-  }
-
-  .animate-drop-icon {
-    animation: drop-icon-bob 2.8s 520ms ease-in-out infinite;
-  }
-
-  .animate-drop-badge {
-    animation: drop-badge-in 600ms 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-
   .animate-soft-pulse {
     animation: soft-pulse 2.8s ease-in-out infinite;
   }
@@ -348,50 +270,6 @@
     }
   }
 
-  @keyframes drop-card-in {
-    from {
-      filter: blur(4px);
-      opacity: 0;
-      transform: translateY(18px) scale(0.94);
-    }
-    to {
-      filter: blur(0);
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
-  @keyframes drop-card-float {
-    0%,
-    100% {
-      transform: translateY(0) rotate(0deg);
-    }
-    50% {
-      transform: translateY(-5px) rotate(0.25deg);
-    }
-  }
-
-  @keyframes drop-icon-bob {
-    0%,
-    100% {
-      transform: translateY(0) rotate(0deg);
-    }
-    50% {
-      transform: translateY(-4px) rotate(-2deg);
-    }
-  }
-
-  @keyframes drop-badge-in {
-    from {
-      opacity: 0;
-      transform: scale(0.4) rotate(-18deg);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) rotate(0deg);
-    }
-  }
-
   @keyframes soft-pulse {
     0%,
     100% {
@@ -425,9 +303,6 @@
     .animate-enter,
     .animate-enter-delayed,
     .animate-drop-overlay,
-    .animate-drop-card,
-    .animate-drop-icon,
-    .animate-drop-badge,
     .animate-soft-pulse,
     .animate-shimmer {
       animation: none;

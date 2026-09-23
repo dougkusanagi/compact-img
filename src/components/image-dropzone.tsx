@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { ImagePlus, LoaderCircle, Plus, ShieldCheck, UploadCloud } from "lucide-react";
+import { ImagePlus, LoaderCircle, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACCEPTED_IMAGE_TYPES, isAcceptedImage } from "@/lib/image-utils";
 import {
@@ -272,52 +272,15 @@ export function ImageDropzone({
 
     return (
       <div
-        className="animate-drop-overlay pointer-events-none fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950/35 p-6 backdrop-blur-md"
+        className="animate-drop-overlay pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:p-5"
         role="status"
         aria-live="polite"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(96,165,250,0.16),transparent_28rem)]" />
-        <div className="animate-soft-pulse absolute -left-24 top-[14%] h-72 w-72 rounded-full bg-blue-400/15 blur-3xl" />
-        <div className="animate-soft-pulse absolute -right-20 bottom-[8%] h-80 w-80 rounded-full bg-cyan-300/10 blur-3xl [animation-delay:700ms]" />
-        <div className="relative w-full max-w-[430px]">
-          <div className="animate-soft-pulse absolute -inset-5 rounded-[2.5rem] bg-blue-400/20 blur-2xl" />
-          <div className="animate-drop-card relative overflow-hidden rounded-[2rem] border border-white/80 bg-white/95 px-7 py-8 text-center shadow-[0_28px_90px_rgba(15,23,42,0.24)] ring-1 ring-slate-950/5 sm:px-10 sm:py-9">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-blue-600 to-violet-500" />
-            <div className="absolute -right-16 -top-20 h-44 w-44 rounded-full bg-blue-100/70 blur-3xl" />
-            <div className="absolute -bottom-24 -left-16 h-44 w-44 rounded-full bg-cyan-100/70 blur-3xl" />
-
-            <div className="relative mx-auto mb-5 h-20 w-20">
-              <div className="animate-soft-pulse absolute inset-0 rounded-[26px] border border-blue-200/80 bg-gradient-to-br from-blue-50 to-indigo-100 shadow-[0_12px_30px_rgba(37,99,235,0.14)]" />
-              <div className="animate-drop-icon absolute inset-2 flex items-center justify-center rounded-[20px] bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.34)]">
-                <UploadCloud className="h-9 w-9" strokeWidth={1.8} />
-              </div>
-              <div className="animate-drop-badge absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-cyan-400 text-white shadow-lg shadow-cyan-500/25">
-                <Plus className="h-4 w-4" strokeWidth={2.5} />
-              </div>
-            </div>
-
-            <div className="relative">
-              <h2 className="text-xl font-bold tracking-tight text-slate-950">Solte para adicionar</h2>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">Adicione uma ou mais imagens de uma vez</p>
-
-              <div className="mt-6 flex flex-wrap justify-center gap-2">
-                {[
-                  ["JPG", "bg-rose-50 text-rose-700 ring-rose-100"],
-                  ["PNG", "bg-emerald-50 text-emerald-700 ring-emerald-100"],
-                  ["WEBP", "bg-blue-50 text-blue-700 ring-blue-100"],
-                  ["AVIF", "bg-violet-50 text-violet-700 ring-violet-100"]
-                ].map(([label, className]) => (
-                  <span key={label} className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ring-1", className)}>
-                    {label}
-                  </span>
-                ))}
-              </div>
-
-              <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200/80">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                Processamento local e seguro
-              </div>
-            </div>
+        <div className="flex h-full w-full flex-col items-center justify-center rounded-[20px] border-[5px] border-dashed border-primary px-5 text-center shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.18)] sm:rounded-[28px]">
+          <div className="animate-enter flex flex-col items-center text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.28)]">
+            <UploadCloud className="mb-4 h-12 w-12 text-primary" strokeWidth={1.6} aria-hidden="true" />
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Solte as imagens aqui</h2>
+            <p className="mt-2 text-sm font-medium text-white/85 sm:text-base">JPG, PNG, WebP ou AVIF</p>
           </div>
         </div>
       </div>
