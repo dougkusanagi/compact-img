@@ -109,6 +109,24 @@ export function buildSiblingDestinationPath(sourcePath: string, fileName: string
   return [...segments, fileName].join("\\");
 }
 
+export function normalizeSubfolderName(value: string) {
+  const trimmed = value.trim();
+  return trimmed && trimmed !== "." && trimmed !== ".." && !/[\\/]/.test(trimmed)
+    ? trimmed
+    : "imagens-compactadas";
+}
+
+export function isValidSubfolderName(value: string) {
+  const normalized = value.trim();
+  return Boolean(normalized) && normalized !== "." && normalized !== ".." && !/[\\/]/.test(normalized);
+}
+
+export function buildSubfolderDestinationPath(sourcePath: string, subfolderName: string, fileName: string) {
+  const segments = sourcePath.split(/[\\/]/);
+  segments.pop();
+  return [...segments, normalizeSubfolderName(subfolderName), fileName].join("\\");
+}
+
 export async function chooseSavePath(sourcePath: string | undefined, fileName: string) {
   return save({
     title: "Salvar imagem compactada",

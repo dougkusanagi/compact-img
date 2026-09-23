@@ -21,6 +21,21 @@ export type ImageDimensions = {
 
 export type DownloadMode = "same-folder" | "choose-location";
 
+export type DownloadPreferences = {
+  mode: DownloadMode;
+  autoDownload: boolean;
+  removeAfterDownload: boolean;
+  saveInSubfolder: boolean;
+  subfolderName: string;
+};
+
+export type QueueSummary = {
+  totalCount: number;
+  completedCount: number;
+  errorCount: number;
+  averageReduction?: number;
+};
+
 export type QueueImage = {
   id: string;
   file: File;
