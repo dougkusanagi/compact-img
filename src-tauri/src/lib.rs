@@ -144,8 +144,8 @@ fn get_target_dimensions(
 
     if !settings.keep_aspect_ratio {
         return ImageDimensions {
-            width: settings.max_width.max(1),
-            height: settings.max_height.max(1),
+            width: settings.max_width.min(width).max(1),
+            height: settings.max_height.min(height).max(1),
         };
     }
 
@@ -325,8 +325,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        encode_native_compression_payload, write_compressed_image, write_compressed_image_to_path,
-        ImageDimensions,
+        encode_native_compression_payload, get_target_dimensions, write_compressed_image,
+        write_compressed_image_to_path, CompressionSettings, ImageDimensions, JpegCompressionMode,
     };
     use std::{
         fs,
@@ -403,5 +403,35 @@ mod tests {
 
         assert_eq!(&payload[..header_end], b"4000,3000,1920,1440");
         assert_eq!(&payload[header_end + 1..], &[0xff, 0xd8, 0xff]);
+    }
+
+    #[test]
+    fn target_dimensions_preserve_or_limit_without_upscaling() {
+        let mut settings = CompressionSettings {
+            preserve_original_dimensions: false,
+            max_width: 100,
+            max_height: 100,
+            quality: 80,
+            jpeg_compression_mode: JpegCompressionMode::Balanced,
+            keep_aspect_ratio: true,
+            strip_metadata: true,
+        };
+        let dimensions = get_target_dimensions(400, 200, &settings);
+        assert_eq!((dimensions.width, dimensions.height), (100, 50));
+
+        settings.keep_aspect_ratio = false;
+        let dimensions = get_target_dimensions(40, 200, &settings);
+        assert_eq!((dimensions.width, dimensions.height), (40, 100));
+
+        settings.preserve_original_dimensions = true;
+        let dimensions = get_target_dimensions(400, 200, &settings);
+        assert_eq!((dimensions.width, dimensions.height), (400, 200));
+    }
+
+    #[test]
+    fn rejects_mismatched_custom_destination_name() {
+        let destination = temporary_directory().join("output.webp");
+        assert!(write_compressed_image_to_path(&destination, "other.webp", b"image").is_err());
+        assert!(!destination.exists());
     }
 }
