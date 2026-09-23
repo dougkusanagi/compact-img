@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
   ArrowDownToLine,
   Check,
@@ -69,6 +70,40 @@ const FORMAT_OPTIONS: { value: OutputFormat; label: string }[] = [
   { value: "avif", label: "AVIF" }
 ];
 
+function SettingField({
+  label,
+  children,
+  htmlFor,
+  labelId,
+  trailing,
+  className
+}: {
+  label: string;
+  children: ReactNode;
+  htmlFor?: string;
+  labelId?: string;
+  trailing?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("grid gap-2", className)}>
+      <div className="flex min-h-5 items-center justify-between gap-2">
+        {htmlFor ? (
+          <Label htmlFor={htmlFor} className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {label}
+          </Label>
+        ) : (
+          <span id={labelId} className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {label}
+          </span>
+        )}
+        {trailing}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function OutputSettings({
   settings,
   onSettingsChange,
@@ -135,9 +170,9 @@ function OutputSettings({
       </div>
 
       <div className="grid gap-5 p-5">
-        <fieldset className="grid gap-2.5" disabled={disabled}>
-          <legend className="text-xs font-semibold uppercase tracking-wide text-slate-500">Formato</legend>
-          <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1">
+        <fieldset className="m-0 min-w-0 border-0 p-0" aria-labelledby="beta-format-label" disabled={disabled}>
+          <SettingField label="Formato" labelId="beta-format-label">
+            <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1">
             {FORMAT_OPTIONS.map((option) => (
               <button
                 key={option.value}
@@ -154,18 +189,19 @@ function OutputSettings({
                 {option.label}
               </button>
             ))}
-          </div>
+            </div>
+          </SettingField>
         </fieldset>
 
-        <div className="grid gap-3">
-          <div className="flex items-end justify-between gap-3">
-            <Label htmlFor="beta-quality" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Qualidade
-            </Label>
+        <SettingField
+          label="Qualidade"
+          htmlFor="beta-quality"
+          trailing={(
             <span className="text-sm font-semibold tabular-nums text-slate-900">
               {settings.outputFormat === "png" ? "Sem perdas" : `${settings.quality}%`}
             </span>
-          </div>
+          )}
+        >
           <Slider
             id="beta-quality"
             min={1}
@@ -177,17 +213,15 @@ function OutputSettings({
             aria-label="Qualidade de saída"
             className="py-1"
           />
-          <div className="flex justify-between text-[11px] text-slate-400">
-            <span>Arquivo menor</span><span>Mais qualidade</span>
-          </div>
-        </div>
+        </SettingField>
 
-        <div className="grid gap-3 border-t border-slate-100 pt-4">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tamanho máximo</Label>
-            <Maximize2 className="h-3.5 w-3.5 text-slate-400" />
-          </div>
-          <div className="grid grid-cols-4 gap-1.5">
+        <SettingField
+          label="Tamanho máximo"
+          labelId="beta-size-label"
+          trailing={<Maximize2 className="h-3.5 w-3.5 text-slate-400" />}
+          className="border-t border-slate-100 pt-4"
+        >
+          <div className="grid grid-cols-4 gap-1.5" role="group" aria-labelledby="beta-size-label">
             {([
               ["original", "Original"],
               ["web", "Web"],
@@ -213,8 +247,7 @@ function OutputSettings({
           </div>
           {!settings.preserveOriginalDimensions ? (
             <div className="grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-end gap-1.5">
-              <div className="grid gap-1.5">
-                <Label htmlFor="beta-width" className="text-[11px] text-slate-500">Largura</Label>
+              <SettingField label="Largura" htmlFor="beta-width">
                 <div className="relative">
                   <Input
                     id="beta-width"
@@ -228,7 +261,7 @@ function OutputSettings({
                   />
                   <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">px</span>
                 </div>
-              </div>
+              </SettingField>
               <button
                 type="button"
                 aria-pressed={settings.keepAspectRatio}
@@ -247,8 +280,7 @@ function OutputSettings({
                   ? <LockKeyhole className="h-4 w-4" />
                   : <LockKeyholeOpen className="h-4 w-4" />}
               </button>
-              <div className="grid gap-1.5">
-                <Label htmlFor="beta-height" className="text-[11px] text-slate-500">Altura</Label>
+              <SettingField label="Altura" htmlFor="beta-height">
                 <div className="relative">
                   <Input
                     id="beta-height"
@@ -262,16 +294,15 @@ function OutputSettings({
                   />
                   <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">px</span>
                 </div>
-              </div>
+              </SettingField>
             </div>
           ) : (
             <p className="text-xs leading-relaxed text-slate-500">Mantém as dimensões de cada arquivo original.</p>
           )}
-        </div>
+        </SettingField>
 
         {settings.outputFormat === "jpeg" && isDesktop ? (
-          <div className="grid gap-2 border-t border-slate-100 pt-4">
-            <Label htmlFor="beta-jpeg-mode" className="text-xs font-semibold uppercase tracking-wide text-slate-500">Modo JPG</Label>
+          <SettingField label="Modo JPG" htmlFor="beta-jpeg-mode" className="border-t border-slate-100 pt-4">
             <select
               id="beta-jpeg-mode"
               value={settings.jpegCompressionMode}
@@ -283,7 +314,7 @@ function OutputSettings({
               <option value="balanced">Balanceada</option>
               <option value="max">Compressão máxima</option>
             </select>
-          </div>
+          </SettingField>
         ) : null}
 
         <details className="group border-t border-slate-100 pt-4">
@@ -303,8 +334,7 @@ function OutputSettings({
                 />
               </div>
             ) : null}
-            <div className="grid gap-2">
-              <Label htmlFor="beta-download-mode" className="text-xs font-medium text-slate-600">Destino do download</Label>
+            <SettingField label="Destino do download" htmlFor="beta-download-mode">
               <select
                 id="beta-download-mode"
                 value={downloadPreferences.mode}
@@ -315,7 +345,7 @@ function OutputSettings({
                 <option value="same-folder">{isDesktop ? "Mesma pasta" : "Pasta de downloads"}</option>
                 <option value="choose-location">Escolher local ao salvar</option>
               </select>
-            </div>
+            </SettingField>
             {downloadPreferences.mode === "same-folder" ? (
               <>
                 <PreferenceToggle
