@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { ImagePlus, LoaderCircle, UploadCloud } from "lucide-react";
+import { ImagePlus, LoaderCircle, Plus, ShieldCheck, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACCEPTED_IMAGE_TYPES, isAcceptedImage } from "@/lib/image-utils";
 import {
@@ -256,7 +256,7 @@ export function ImageDropzone({
           type="button"
           onClick={() => void chooseFiles()}
           disabled={isImporting || disabled}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3.5 text-sm font-semibold text-primary transition-colors hover:border-primary/35 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary/10 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:cursor-wait disabled:opacity-60"
         >
           {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
           {isImporting ? "Carregando..." : "Adicionar imagens"}
@@ -272,16 +272,53 @@ export function ImageDropzone({
 
     return (
       <div
-        className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-6 backdrop-blur-[2px]"
+        className="animate-drop-overlay pointer-events-none fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950/35 p-6 backdrop-blur-md"
         role="status"
         aria-live="polite"
       >
-        <div className="flex max-w-md flex-col items-center rounded-2xl border-2 border-dashed border-white bg-white/95 px-10 py-10 text-center shadow-2xl">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-            <UploadCloud className="h-7 w-7" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_44%,rgba(96,165,250,0.16),transparent_28rem)]" />
+        <div className="animate-soft-pulse absolute -left-24 top-[14%] h-72 w-72 rounded-full bg-blue-400/15 blur-3xl" />
+        <div className="animate-soft-pulse absolute -right-20 bottom-[8%] h-80 w-80 rounded-full bg-cyan-300/10 blur-3xl [animation-delay:700ms]" />
+        <div className="relative w-full max-w-[430px]">
+          <div className="animate-soft-pulse absolute -inset-5 rounded-[2.5rem] bg-blue-400/20 blur-2xl" />
+          <div className="animate-drop-card relative overflow-hidden rounded-[2rem] border border-white/80 bg-white/95 px-7 py-8 text-center shadow-[0_28px_90px_rgba(15,23,42,0.24)] ring-1 ring-slate-950/5 sm:px-10 sm:py-9">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-blue-600 to-violet-500" />
+            <div className="absolute -right-16 -top-20 h-44 w-44 rounded-full bg-blue-100/70 blur-3xl" />
+            <div className="absolute -bottom-24 -left-16 h-44 w-44 rounded-full bg-cyan-100/70 blur-3xl" />
+
+            <div className="relative mx-auto mb-5 h-20 w-20">
+              <div className="animate-soft-pulse absolute inset-0 rounded-[26px] border border-blue-200/80 bg-gradient-to-br from-blue-50 to-indigo-100 shadow-[0_12px_30px_rgba(37,99,235,0.14)]" />
+              <div className="animate-drop-icon absolute inset-2 flex items-center justify-center rounded-[20px] bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.34)]">
+                <UploadCloud className="h-9 w-9" strokeWidth={1.8} />
+              </div>
+              <div className="animate-drop-badge absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-cyan-400 text-white shadow-lg shadow-cyan-500/25">
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+              </div>
+            </div>
+
+            <div className="relative">
+              <h2 className="text-xl font-bold tracking-tight text-slate-950">Solte para adicionar</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">Adicione uma ou mais imagens de uma vez</p>
+
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                {[
+                  ["JPG", "bg-rose-50 text-rose-700 ring-rose-100"],
+                  ["PNG", "bg-emerald-50 text-emerald-700 ring-emerald-100"],
+                  ["WEBP", "bg-blue-50 text-blue-700 ring-blue-100"],
+                  ["AVIF", "bg-violet-50 text-violet-700 ring-violet-100"]
+                ].map(([label, className]) => (
+                  <span key={label} className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ring-1", className)}>
+                    {label}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200/80">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                Processamento local e seguro
+              </div>
+            </div>
           </div>
-          <h2 className="text-lg font-semibold text-slate-900">Solte as imagens para adicionar</h2>
-          <p className="mt-2 text-sm text-slate-500">JPG, PNG, WEBP e AVIF · Processamento local</p>
         </div>
       </div>
     );
@@ -292,19 +329,19 @@ export function ImageDropzone({
       {...getRootProps()}
       aria-busy={isImporting}
       className={cn(
-        "group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed bg-card text-center transition-all duration-300",
-        compact ? "min-h-[232px] px-6 py-7 sm:px-10" : "min-h-72 px-6 py-10",
+        "dropzone-surface group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed bg-card text-center transition-all duration-300 hover:-translate-y-0.5",
+        compact ? "min-h-[290px] px-6 py-8 sm:px-10" : "min-h-80 px-6 py-10",
         isImporting || disabled
-          ? "border-primary/60 bg-primary/[0.04] shadow-md shadow-primary/10"
+          ? "border-primary/60 bg-primary/[0.04] shadow-lg shadow-primary/10"
           : dragActive
-          ? "scale-[1.01] border-primary bg-primary/[0.06] shadow-lg shadow-primary/10"
-          : "border-border hover:border-primary/40 hover:shadow-md"
+          ? "scale-[1.01] border-primary bg-primary/[0.06] shadow-xl shadow-primary/15"
+          : "border-border hover:border-primary/40 hover:shadow-lg"
       )}
     >
       <input {...getInputProps()} />
       <div
         className={cn(
-        compact ? "mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-all duration-300" : "mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-300",
+        compact ? "dropzone-icon mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-all duration-300" : "dropzone-icon mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-all duration-300",
           isImporting ? "scale-105" : dragActive ? "scale-110 rotate-3" : "group-hover:-translate-y-1"
         )}
       >
@@ -316,7 +353,7 @@ export function ImageDropzone({
           <UploadCloud className="h-8 w-8" />
         )}
       </div>
-      <h2 className={cn("font-semibold tracking-tight", compact ? "text-lg" : "text-xl")}>
+      <h2 className={cn("font-bold tracking-tight", compact ? "text-xl" : "text-xl")}>
         {isImporting
           ? `Carregando ${importingCount} ${importingCount === 1 ? "imagem" : "imagens"}...`
           : dragActive
@@ -334,7 +371,7 @@ export function ImageDropzone({
         type="button"
         onClick={chooseFiles}
         disabled={isImporting || disabled}
-        className={cn("inline-flex items-center gap-2 rounded-lg bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60", compact ? "mt-5 h-11 px-5 text-sm" : "mt-6 h-11 px-5 text-sm")}
+        className={cn("animate-shimmer inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 bg-[length:180%_100%] font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-[background-position,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:bg-[position:100%_0] hover:shadow-xl hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60", compact ? "mt-5 h-11 px-5 text-sm" : "mt-6 h-11 px-5 text-sm")}
       >
         {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
         {isImporting ? "Carregando..." : "Escolher arquivos"}

@@ -30,6 +30,7 @@ import { CompressionSettings as CompressionSettingsPanel } from "@/components/co
 import { ImageDropzone } from "@/components/image-dropzone";
 import { ImageQueue } from "@/components/image-queue";
 import { BetaImageWorkspace } from "@/components/beta-image-workspace";
+import { WorkspaceIntro } from "@/components/workspace-intro";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
@@ -774,8 +775,8 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
   }, []);
 
   return (
-    <main className={cn("min-h-screen", variant === "beta" && "bg-[#f6f8fb]")}>
-      <header className={cn("sticky top-0 z-30 border-b bg-card/90 backdrop-blur-xl", variant === "beta" && "border-slate-200 bg-white/90")}>
+    <main className={cn("min-h-screen", variant === "beta" && "beta-shell")}>
+      <header className={cn("app-header sticky top-0 z-30 border-b bg-card/90 backdrop-blur-xl", variant === "beta" && "beta-header border-slate-200 bg-white/90")}>
         <div className={cn("mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 lg:px-6", variant === "beta" && "py-2.5")}>
           <div className="flex items-center gap-3">
             <img
@@ -783,7 +784,7 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
               alt=""
               width={variant === "beta" ? 34 : 40}
               height={variant === "beta" ? 34 : 40}
-              className={cn("rounded-xl shadow-sm shadow-primary/25", variant === "beta" ? "h-[34px] w-[34px]" : "h-10 w-10")}
+              className={cn("rounded-xl shadow-sm shadow-primary/25 transition-transform duration-300 hover:rotate-[-4deg] hover:scale-105", variant === "beta" ? "h-[34px] w-[34px]" : "h-10 w-10")}
             />
             <div>
               <h1 className={cn("font-bold tracking-tight", variant === "beta" ? "text-base" : "text-lg")}>Compact Img</h1>
@@ -791,12 +792,12 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <nav aria-label="Versão da interface" className="flex items-center rounded-lg border bg-background p-1">
+            <nav aria-label="Versão da interface" className="app-nav flex items-center rounded-xl border bg-background/80 p-1">
               <Link
                 href="/"
                 aria-current={variant === "current" ? "page" : undefined}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   variant === "current" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
@@ -806,7 +807,7 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
                 href="/beta/"
                 aria-current={variant === "beta" ? "page" : undefined}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   variant === "beta" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
@@ -920,6 +921,7 @@ export function ImageCompressorApp({ variant = "current" }: ImageCompressorAppPr
         />
       ) : (
       <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+        {!images.length && !lastQueueSummary ? <WorkspaceIntro /> : null}
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="grid min-w-0 gap-5 animate-enter-delayed">
             {invalidFiles.length ? (

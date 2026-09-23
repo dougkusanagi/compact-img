@@ -36,6 +36,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { WorkspaceIntro } from "@/components/workspace-intro";
 
 type BetaImageWorkspaceProps = {
   settings: CompressionSettings;
@@ -82,51 +84,6 @@ const JPEG_MODE_OPTIONS = [
   { value: "balanced", label: "Balanceada" },
   { value: "max", label: "Compressão máxima" }
 ] as const;
-
-function SegmentedControl<T extends string>({
-  options,
-  value,
-  onChange,
-  disabled,
-  columns,
-  ariaLabel,
-  ariaLabelledBy
-}: {
-  options: readonly { value: T; label: string }[];
-  value: string;
-  onChange: (value: T) => void;
-  disabled?: boolean;
-  columns: 3 | 4;
-  ariaLabel?: string;
-  ariaLabelledBy?: string;
-}) {
-  return (
-    <div
-      className={cn("grid gap-1 rounded-xl bg-slate-100 p-1", columns === 3 ? "grid-cols-3" : "grid-cols-4")}
-      role="group"
-      aria-label={ariaLabel}
-      aria-labelledby={ariaLabelledBy}
-    >
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          disabled={disabled}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            "h-9 rounded-lg text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50",
-            value === option.value
-              ? "bg-white text-blue-700 shadow-sm"
-              : "text-slate-500 hover:text-slate-900"
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function SettingField({
   label,
@@ -216,9 +173,9 @@ function OutputSettings({
   };
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.045)]">
+    <section className="beta-card overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+        <div className="beta-icon-tile flex h-9 w-9 items-center justify-center rounded-xl text-blue-600">
           <Settings2 className="h-4 w-4" />
         </div>
         <div className="min-w-0">
@@ -235,7 +192,6 @@ function OutputSettings({
               value={settings.outputFormat}
               onChange={(value) => update("outputFormat", value)}
               disabled={disabled}
-              columns={4}
               ariaLabelledBy="beta-format-label"
             />
           </SettingField>
@@ -274,7 +230,6 @@ function OutputSettings({
             value={activeSizePreset}
             onChange={setSizePreset}
             disabled={disabled}
-            columns={4}
             ariaLabelledBy="beta-size-label"
           />
           {!settings.preserveOriginalDimensions ? (
@@ -340,14 +295,13 @@ function OutputSettings({
               value={settings.jpegCompressionMode}
               onChange={(value) => update("jpegCompressionMode", value)}
               disabled={disabled}
-              columns={3}
               ariaLabelledBy="beta-jpeg-mode-label"
             />
           </SettingField>
         ) : null}
 
         <details className="group border-t border-slate-100 pt-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg text-xs font-semibold text-slate-700 transition-colors hover:text-blue-700 [&::-webkit-details-marker]:hidden">
             Mais opções
             <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
           </summary>
@@ -367,7 +321,7 @@ function OutputSettings({
                 value={downloadPreferences.mode}
                 disabled={disabled}
                 onChange={(event) => updateDownload("mode", event.target.value as DownloadPreferences["mode"])}
-                className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition-[border-color,box-shadow] duration-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
               >
                 <option value="same-folder">{isDesktop ? "Mesma pasta" : "Pasta de downloads"}</option>
                 <option value="choose-location">Escolher local ao salvar</option>
@@ -436,7 +390,7 @@ function PreferenceToggle({
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5">
+    <div className="preference-toggle flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5">
       <Label htmlFor={id} className="text-xs font-medium leading-snug text-slate-600">{label}</Label>
       <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
     </div>
@@ -452,7 +406,7 @@ function StatusPill({ status }: { status: QueueImage["status"] }) {
   }[status];
   const Icon = config.icon;
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold", config.className)}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold", config.className, status === "processing" && "animate-soft-pulse")}>
       <Icon className={cn("h-3 w-3", status === "processing" && "loading-spinner")} />
       {config.label}
     </span>
@@ -465,7 +419,7 @@ function ImagePreview({ image }: { image: QueueImage }) {
   const displayedMode = hasCompressed ? mode : "original";
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.045)]">
+    <section className="beta-card overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
@@ -479,27 +433,17 @@ function ImagePreview({ image }: { image: QueueImage }) {
             </p>
           </div>
         </div>
-        <div className="flex w-fit items-center rounded-lg bg-slate-100 p-1" aria-label="Modo de pré-visualização">
-          {([
-            ["compare", "Comparar"],
-            ["original", "Original"],
-            ["compressed", "Saída"]
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              disabled={value !== "original" && !hasCompressed}
-              aria-pressed={displayedMode === value}
-              onClick={() => setMode(value)}
-              className={cn(
-                "h-7 rounded-md px-2.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                displayedMode === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          options={[
+            { value: "compare", label: "Comparar", disabled: !hasCompressed },
+            { value: "original", label: "Original" },
+            { value: "compressed", label: "Saída", disabled: !hasCompressed }
+          ]}
+          value={displayedMode}
+          onChange={setMode}
+          ariaLabel="Modo de pré-visualização"
+          className="w-full sm:w-[242px]"
+        />
       </div>
 
       <div className="bg-[linear-gradient(45deg,#f1f5f9_25%,transparent_25%,transparent_75%,#f1f5f9_75%),linear-gradient(45deg,#f1f5f9_25%,transparent_25%,transparent_75%,#f1f5f9_75%)] bg-[length:24px_24px] bg-[position:0_0,12px_12px] p-3 sm:p-5">
@@ -559,7 +503,7 @@ function QueuePanel({
   const errorCount = images.filter((image) => image.status === "error").length;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.045)]">
+    <section className="beta-card overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-slate-900">Imagens</h2>
@@ -592,14 +536,14 @@ function QueuePanel({
         {images.map((image) => {
           const reduction = image.compressedBlob ? getReduction(image.file.size, image.compressedBlob.size) : undefined;
           return (
-            <div key={image.id} className={cn("flex items-center gap-2 px-3 py-2.5 transition-colors sm:gap-3 sm:px-5", selectedId === image.id && "bg-blue-50/55")}>
+            <div key={image.id} className={cn("queue-row group/queue-row flex items-center gap-2 px-3 py-2.5 transition-[background-color,transform] duration-200 hover:bg-slate-50 sm:gap-3 sm:px-5", selectedId === image.id && "bg-blue-50/55 hover:bg-blue-50/75")}>
               <button
                 type="button"
                 aria-pressed={selectedId === image.id}
                 onClick={() => onSelect(image.id)}
                 className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
-                <img src={image.originalUrl} alt="" loading="lazy" decoding="async" className="h-11 w-14 shrink-0 rounded-lg border border-slate-200 bg-slate-50 object-cover" />
+                <img src={image.originalUrl} alt="" loading="lazy" decoding="async" className="h-11 w-14 shrink-0 rounded-lg border border-slate-200 bg-slate-50 object-cover transition-transform duration-200 group-hover/queue-row:scale-[1.03]" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-semibold text-slate-800" title={image.file.name}>{image.file.name}</span>
                   <span className="mt-1 block truncate text-[11px] text-slate-500">
@@ -639,7 +583,7 @@ function CompletedBatch({ summary, onFiles, onInvalidFiles, onClear, isDesktop }
   isDesktop: boolean;
 }) {
   return (
-    <section className="flex min-h-[240px] flex-col justify-between rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 sm:p-7">
+    <section className="beta-card animate-enter flex min-h-[240px] flex-col justify-between rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-5 sm:p-7">
       <div>
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><Check className="h-5 w-5" /></span>
         <h2 className="mt-4 text-lg font-semibold text-slate-900">Lote concluído</h2>
@@ -691,19 +635,20 @@ export function BetaImageWorkspace(props: BetaImageWorkspaceProps) {
   const readyCount = images.filter((image) => image.status === "done" && image.compressedBlob).length;
 
   return (
-    <main className="min-h-[calc(100vh-64px)] bg-[#f6f8fb]">
+    <main className="min-h-[calc(100vh-64px)] bg-transparent">
       <div className={cn(
-        "mx-auto max-w-[1440px] px-3 py-4 sm:px-5 sm:py-6 xl:px-8"
+        "mx-auto max-w-[1440px] animate-enter px-3 py-4 sm:px-5 sm:py-6 xl:px-8"
       )}>
+        {!images.length && !lastBatchSummary ? <WorkspaceIntro /> : null}
         {invalidFiles.length ? (
-          <div role="status" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <div role="status" className="animate-enter mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-sm shadow-rose-900/5">
             <strong>Arquivos ignorados:</strong> {invalidFiles.join(", ")}
             <button type="button" aria-label="Fechar aviso" onClick={() => onInvalidFiles([])} className="float-right font-semibold">×</button>
           </div>
         ) : null}
 
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-5">
-          <div className="min-w-0">
+          <div className="animate-enter min-w-0">
             {selectedImage || lastBatchSummary || !images.length ? (
               <section className="min-w-0">
                 {selectedImage ? (
@@ -743,7 +688,7 @@ export function BetaImageWorkspace(props: BetaImageWorkspaceProps) {
             ) : null}
           </div>
 
-          <aside className="xl:sticky xl:top-4">
+          <aside className="animate-enter-delayed xl:sticky xl:top-4">
             <div className="mb-4 grid gap-2">
               {isProcessing ? (
                 <Button type="button" variant="destructive" className="h-11 w-full" disabled={isCancelRequested} onClick={onCancelProcess}>
@@ -751,7 +696,7 @@ export function BetaImageWorkspace(props: BetaImageWorkspaceProps) {
                   {isCancelRequested ? "Cancelando…" : "Cancelar compactação"}
                 </Button>
               ) : (
-                <Button type="button" className="h-11 w-full" disabled={!images.length} onClick={onProcess}>
+                <Button type="button" className="beta-primary-action h-11 w-full" disabled={!images.length} onClick={onProcess}>
                   {hasProcessed ? <RefreshCw className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
                   {hasProcessed ? "Recompactar lote" : `Compactar ${images.length || "imagens"}`}
                 </Button>

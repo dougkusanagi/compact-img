@@ -7,12 +7,13 @@ import type {
   JpegCompressionMode
 } from "@/lib/image-types";
 import type { OutputFormat } from "@/lib/utils";
-import { ChevronDown, CircleHelp, Download, Gauge, ImageIcon, Link2, Maximize2, Settings2, Unlink } from "lucide-react";
+import { ChevronDown, CircleHelp, Download, Gauge, ImageIcon, Link2, Maximize2, Settings2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 type CompressionSettingsProps = {
   settings: CompressionSettingsType;
@@ -130,29 +131,19 @@ export function CompressionSettings({
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-3 rounded-lg border bg-muted/35 p-1" role="group" aria-label="Modo de redimensionamento">
-            {[
-              ["original", "Original"],
-              ["maximum", "Proporção"],
-              ["custom", "Personalizado"]
-            ].map(([mode, label]) => (
-              <button
-                key={mode}
-                type="button"
-                disabled={disabled}
-                aria-pressed={resizeMode === mode}
-                onClick={() => setResizeMode(mode as "original" | "maximum" | "custom")}
-                className={
-                  resizeMode === mode
-                    ? "inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-2 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                    : "inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                }
-              >
-                {mode === "maximum" ? (resizeMode === mode ? <Link2 className="h-3.5 w-3.5" /> : <Unlink className="h-3.5 w-3.5" />) : null}
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            options={[
+              { value: "original", label: "Original" },
+              { value: "maximum", label: <><Link2 className="h-3.5 w-3.5" />Proporção</> },
+              { value: "custom", label: "Personalizado" }
+            ]}
+            value={resizeMode}
+            onChange={setResizeMode}
+            disabled={disabled}
+            tone="primary"
+            ariaLabel="Modo de redimensionamento"
+            className="border border-slate-200/80 bg-slate-100/75"
+          />
           {resizeMode !== "original" ? (
             <>
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">

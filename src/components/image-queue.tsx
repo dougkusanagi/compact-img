@@ -134,7 +134,7 @@ function ImageQueueItemComponent({
   return (
     <article
       className={cn(
-        "[content-visibility:auto] [contain-intrinsic-size:96px] transition-all duration-200 border-l-2",
+        "queue-row [content-visibility:auto] [contain-intrinsic-size:96px] transition-all duration-200 border-l-2",
         isSelected ? "border-primary bg-primary/[0.015]" : "border-transparent hover:bg-muted/15"
       )}
     >

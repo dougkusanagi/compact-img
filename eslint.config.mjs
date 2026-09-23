@@ -7,7 +7,7 @@ const compat = new FlatCompat({ baseDirectory: currentDirectory });
 
 const config = [
   {
-    ignores: [".next/**", "out/**", "dist/**", "src-tauri/target/**"]
+    ignores: [".next/**", ".next-*/**", "out/**", "dist/**", "src-tauri/target/**"]
   },
   ...compat.extends("next/core-web-vitals"),
   {
