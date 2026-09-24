@@ -256,7 +256,7 @@ export function ImageDropzone({
           type="button"
           onClick={() => void chooseFiles()}
           disabled={isImporting || disabled}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary/10 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:cursor-wait disabled:opacity-60"
+          className="motion-hover-settle inline-flex h-10 items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:border-primary/35 hover:bg-primary/10 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:cursor-wait disabled:opacity-60"
         >
           {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
           {isImporting ? "Carregando..." : "Adicionar imagens"}
@@ -291,8 +291,9 @@ export function ImageDropzone({
     <section
       {...getRootProps()}
       aria-busy={isImporting}
+      data-drag-active={dragActive}
       className={cn(
-        "dropzone-surface group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed bg-card text-center transition-all duration-300 hover:-translate-y-0.5",
+        "dropzone-surface group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed bg-card text-center transition-[border-color,box-shadow,background-color] duration-300",
         compact ? "min-h-[290px] px-6 py-8 sm:px-10" : "min-h-80 px-6 py-10",
         isImporting || disabled
           ? "border-primary/60 bg-primary/[0.04] shadow-lg shadow-primary/10"
@@ -305,7 +306,7 @@ export function ImageDropzone({
       <div
         className={cn(
         compact ? "dropzone-icon mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-all duration-300" : "dropzone-icon mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-all duration-300",
-          isImporting ? "scale-105" : dragActive ? "scale-110 rotate-3" : "group-hover:-translate-y-1"
+          isImporting ? "scale-105" : dragActive ? "scale-110 rotate-3" : null
         )}
       >
         {isImporting ? (
@@ -334,7 +335,7 @@ export function ImageDropzone({
         type="button"
         onClick={chooseFiles}
         disabled={isImporting || disabled}
-        className={cn("animate-shimmer inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 bg-[length:180%_100%] font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-[background-position,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:bg-[position:100%_0] hover:shadow-xl hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60", compact ? "mt-5 h-11 px-5 text-sm" : "mt-6 h-11 px-5 text-sm")}
+        className={cn("motion-hover-settle animate-shimmer inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 bg-[length:180%_100%] font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-[background-position,box-shadow,transform] duration-300 hover:bg-[position:100%_0] hover:shadow-xl hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60", compact ? "mt-5 h-11 px-5 text-sm" : "mt-6 h-11 px-5 text-sm")}
       >
         {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
         {isImporting ? "Carregando..." : "Escolher arquivos"}
