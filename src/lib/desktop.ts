@@ -106,7 +106,7 @@ function parseNativeJpegCompressionPayload(payload: ArrayBuffer) {
 export function buildSiblingDestinationPath(sourcePath: string, fileName: string) {
   const segments = sourcePath.split(/[\\/]/);
   segments.pop();
-  return [...segments, fileName].join("\\");
+  return [...segments, fileName].join(getPathSeparator(sourcePath));
 }
 
 export function normalizeSubfolderName(value: string) {
@@ -124,7 +124,11 @@ export function isValidSubfolderName(value: string) {
 export function buildSubfolderDestinationPath(sourcePath: string, subfolderName: string, fileName: string) {
   const segments = sourcePath.split(/[\\/]/);
   segments.pop();
-  return [...segments, normalizeSubfolderName(subfolderName), fileName].join("\\");
+  return [...segments, normalizeSubfolderName(subfolderName), fileName].join(getPathSeparator(sourcePath));
+}
+
+function getPathSeparator(path: string) {
+  return path.includes("\\") ? "\\" : "/";
 }
 
 export async function chooseSavePath(sourcePath: string | undefined, fileName: string) {
