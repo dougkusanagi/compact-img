@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MoveHorizontal } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
 type BeforeAfterSliderProps = {
@@ -22,7 +23,7 @@ export function BeforeAfterSlider({ beforeUrl, afterUrl, alt }: BeforeAfterSlide
 
   return (
     <div className="grid gap-3">
-      <div className="relative aspect-video overflow-hidden rounded-lg border bg-muted shadow-inner">
+      <div className="relative aspect-video overflow-hidden rounded-md bg-card">
         <img
           src={beforeUrl}
           alt={`${alt} original`}
@@ -41,17 +42,17 @@ export function BeforeAfterSlider({ beforeUrl, afterUrl, alt }: BeforeAfterSlide
           />
         </div>
         <div
-          className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-white shadow-md"
+          className="pointer-events-none absolute inset-y-0 w-px -translate-x-1/2 bg-card shadow-[0_0_0_1px_hsl(var(--foreground)/0.18)]"
           style={{ left: `${position}%` }}
         >
-          <div className="absolute left-1/2 top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-primary text-[10px] font-bold text-white shadow-lg">
-            ↔
+          <div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-foreground/15 bg-card text-foreground shadow-[0_3px_12px_hsl(var(--foreground)/0.14)]">
+            <MoveHorizontal className="h-4 w-4" aria-hidden="true" />
           </div>
         </div>
-        <div className="absolute left-3 top-3 rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
+        <div className="absolute left-3 top-3 rounded-sm bg-foreground/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">
           Depois
         </div>
-        <div className="absolute right-3 top-3 rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
+        <div className="absolute right-3 top-3 rounded-sm bg-foreground/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">
           Antes
         </div>
       </div>

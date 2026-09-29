@@ -298,6 +298,7 @@ export function ImageCompressorApp() {
 
     imagesRef.current = [...imagesRef.current, ...nextImages];
     updateImages((current) => [...current, ...nextImages]);
+    setSelectedId((current) => current ?? nextImages[0].id);
     setLastQueueSummary(undefined);
 
     nextImages.forEach((image) => {
@@ -330,7 +331,7 @@ export function ImageCompressorApp() {
       }
       return current.filter((item) => item.id !== id);
     });
-    setSelectedId((current) => (current === id ? undefined : current));
+    setSelectedId((current) => (current === id ? imagesRef.current[0]?.id : current));
   }, [updateImages]);
 
   const removeDownloadedImages = useCallback((ids: string[]) => {
@@ -344,7 +345,7 @@ export function ImageCompressorApp() {
       current.filter((image) => idsToRemove.has(image.id)).forEach(revokeImageUrls);
       return current.filter((image) => !idsToRemove.has(image.id));
     });
-    setSelectedId((current) => current && idsToRemove.has(current) ? undefined : current);
+    setSelectedId((current) => current && idsToRemove.has(current) ? imagesRef.current[0]?.id : current);
   }, [updateImages]);
 
   const clearAll = useCallback(() => {
@@ -875,20 +876,20 @@ export function ImageCompressorApp() {
   }, []);
 
   return (
-    <main className="beta-shell min-h-screen">
-      <header className="app-header beta-header sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5 lg:px-6">
+    <main className="min-h-screen">
+      <header className="sticky top-0 z-30 border-b border-foreground/10 bg-background/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-3 py-2.5 sm:px-5 xl:px-8">
           <div className="flex items-center gap-3">
             <img
-              src="/icon.png"
+              src="/icon.svg"
               alt=""
               width={34}
               height={34}
-              className="h-[34px] w-[34px] rounded-xl shadow-sm shadow-primary/25 transition-transform duration-300 hover:rotate-[-4deg] hover:scale-105"
+              className="h-[34px] w-[34px] rounded-md transition-transform duration-300 hover:rotate-[-4deg] hover:scale-105"
             />
             <h1 className="text-base font-bold tracking-tight">Compact Img</h1>
           </div>
-          <span className="hidden rounded-full border border-slate-200 bg-white/70 px-3 py-1.5 text-xs font-medium text-slate-500 sm:inline-flex">Beta</span>
+          <span className="hidden rounded-sm border border-foreground/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:inline-flex">Beta</span>
         </div>
       </header>
       <BetaImageWorkspace
@@ -908,6 +909,7 @@ export function ImageCompressorApp() {
           onInvalidFiles={setInvalidFiles}
           onFiles={addFiles}
           onSelect={setSelectedId}
+          onClosePreview={() => setSelectedId(undefined)}
           onRemove={removeImage}
           onProcess={processBatch}
           onCancelProcess={cancelProcessing}

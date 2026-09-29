@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useDropzone } from "react-dropzone";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ImagePlus, LoaderCircle, UploadCloud } from "lucide-react";
@@ -39,6 +40,8 @@ export function ImageDropzone({
   const [isGlobalDragActive, setIsGlobalDragActive] = useState(false);
   const [importingCount, setImportingCount] = useState(0);
   const dragDepthRef = useRef(0);
+  const nativeDragActiveRef = useRef(false);
+  const lastNativeDropAtRef = useRef(-Infinity);
   const isImporting = importingCount > 0;
 
   const onDrop = useCallback(
@@ -72,15 +75,26 @@ export function ImageDropzone({
       return;
     }
 
+    let disposed = false;
     let unlisten: (() => void) | undefined;
 
     getCurrentWebview()
       .onDragDropEvent(async ({ payload }) => {
+        if (disposed) {
+          return;
+        }
         if (payload.type === "enter" || payload.type === "over") {
+          nativeDragActiveRef.current = true;
+          dragDepthRef.current = 0;
+          setIsGlobalDragActive(false);
           setIsNativeDragActive(!disabled);
           return;
         }
 
+        if (payload.type === "drop") {
+          lastNativeDropAtRef.current = performance.now();
+        }
+        nativeDragActiveRef.current = false;
         setIsNativeDragActive(false);
         if (payload.type !== "drop" || disabled) {
           return;
@@ -106,10 +120,21 @@ export function ImageDropzone({
         }
       })
       .then((stopListening) => {
-        unlisten = stopListening;
+        if (disposed) {
+          stopListening();
+        } else {
+          unlisten = stopListening;
+        }
+      })
+      .catch((error) => {
+        console.error("Não foi possível acompanhar o arraste nativo:", error);
       });
 
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      nativeDragActiveRef.current = false;
+      unlisten?.();
+    };
   }, [disabled, enableNativeDragDrop, mode, onFiles, onInvalidFiles]);
 
   useEffect(() => {
@@ -118,7 +143,6 @@ export function ImageDropzone({
     }
 
     const isFileDrag = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
-    const isDesktopEnvironment = () => isDesktop || isDesktopApp();
     const resetDragState = () => {
       dragDepthRef.current = 0;
       setIsGlobalDragActive(false);
@@ -130,7 +154,7 @@ export function ImageDropzone({
       }
 
       event.preventDefault();
-      if (disabled || isDesktopEnvironment()) {
+      if (disabled || nativeDragActiveRef.current) {
         return;
       }
 
@@ -144,7 +168,7 @@ export function ImageDropzone({
       }
 
       event.preventDefault();
-      if (disabled || isDesktopEnvironment()) {
+      if (disabled || nativeDragActiveRef.current) {
         return;
       }
 
@@ -160,7 +184,7 @@ export function ImageDropzone({
       }
 
       event.preventDefault();
-      if (disabled || isDesktopEnvironment()) {
+      if (disabled || nativeDragActiveRef.current) {
         return;
       }
 
@@ -177,7 +201,9 @@ export function ImageDropzone({
 
       event.preventDefault();
       resetDragState();
-      if (disabled || isDesktopEnvironment()) {
+      nativeDragActiveRef.current = false;
+      setIsNativeDragActive(false);
+      if (disabled || performance.now() - lastNativeDropAtRef.current < 500) {
         return;
       }
 
@@ -193,14 +219,24 @@ export function ImageDropzone({
         return;
       }
 
-      setImportingCount(acceptedFiles.length);
-      window.requestAnimationFrame(() => {
+      const importFiles = () => {
+        if (performance.now() - lastNativeDropAtRef.current < 500) {
+          return;
+        }
+        setImportingCount(acceptedFiles.length);
         try {
           onFiles(acceptedFiles.map((file) => ({ file })));
         } finally {
           setImportingCount(0);
         }
-      });
+      };
+
+      // O evento nativo pode chegar logo após o drop do WebKitGTK; dê preferência aos caminhos nativos.
+      if (isDesktop) {
+        window.setTimeout(importFiles, 150);
+      } else {
+        window.requestAnimationFrame(importFiles);
+      }
     };
 
     window.addEventListener("dragenter", handleDragEnter);
@@ -247,6 +283,19 @@ export function ImageDropzone({
   }, [disabled, isDesktop, isImporting, onFiles, onInvalidFiles, open]);
 
   const dragActive = isDragActive || isNativeDragActive;
+  const isOverlayVisible = mode === "overlay" && (isGlobalDragActive || isNativeDragActive);
+
+  // Desfoca o app por baixo do overlay. backdrop-filter não funciona no WebKitGTK do app desktop.
+  useEffect(() => {
+    if (!isOverlayVisible) {
+      return;
+    }
+    const root = document.documentElement;
+    root.dataset.dropOverlay = "true";
+    return () => {
+      delete root.dataset.dropOverlay;
+    };
+  }, [isOverlayVisible]);
 
   if (mode === "button") {
     return (
@@ -256,7 +305,7 @@ export function ImageDropzone({
           type="button"
           onClick={() => void chooseFiles()}
           disabled={isImporting || disabled}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary/10 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:cursor-wait disabled:opacity-60"
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-foreground/20 bg-card px-3.5 text-sm font-semibold text-foreground transition-all duration-200 hover:border-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:cursor-wait disabled:opacity-60"
         >
           {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
           {isImporting ? "Carregando..." : "Adicionar imagens"}
@@ -270,20 +319,24 @@ export function ImageDropzone({
       return null;
     }
 
-    return (
+    // Portal: ancestrais animados com transform prenderiam o overlay fixo à coluna do conteúdo.
+    return createPortal(
       <div
-        className="animate-drop-overlay pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:p-5"
+        className="animate-drop-overlay pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/30 p-3 sm:p-4"
         role="status"
         aria-live="polite"
       >
-        <div className="flex h-full w-full flex-col items-center justify-center rounded-[20px] border-[5px] border-dashed border-primary px-5 text-center shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.18)] sm:rounded-[28px]">
-          <div className="animate-enter flex flex-col items-center text-white drop-shadow-[0_2px_10px_rgba(15,23,42,0.28)]">
-            <UploadCloud className="mb-4 h-12 w-12 text-primary" strokeWidth={1.6} aria-hidden="true" />
-            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Solte as imagens aqui</h2>
-            <p className="mt-2 text-sm font-medium text-white/85 sm:text-base">JPG, PNG, WebP ou AVIF</p>
+        <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-dashed border-brand/60 bg-card/30 px-5 text-center">
+          <div className="animate-enter flex flex-col items-center">
+            <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-md bg-brand text-brand-foreground">
+              <UploadCloud className="h-8 w-8" aria-hidden="true" />
+            </span>
+            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Solte as imagens aqui</h2>
+            <p className="mt-2 text-sm text-muted-foreground">JPG, PNG, WebP ou AVIF · Processamento local</p>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
@@ -292,20 +345,20 @@ export function ImageDropzone({
       {...getRootProps()}
       aria-busy={isImporting}
       className={cn(
-        "dropzone-surface group relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed bg-card text-center transition-all duration-300 hover:-translate-y-0.5",
-        compact ? "min-h-[290px] px-6 py-8 sm:px-10" : "min-h-80 px-6 py-10",
+        "dropzone-surface group relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed bg-card px-6 py-10 text-center transition-[border-color,background-color] duration-200 sm:px-10",
+        compact ? "min-h-[360px] lg:min-h-[580px]" : "min-h-80",
         isImporting || disabled
-          ? "border-primary/60 bg-primary/[0.04] shadow-lg shadow-primary/10"
+          ? "border-brand/50"
           : dragActive
-          ? "scale-[1.01] border-primary bg-primary/[0.06] shadow-xl shadow-primary/15"
-          : "border-border hover:border-primary/40 hover:shadow-lg"
+          ? "border-brand"
+          : "border-foreground/25 hover:border-brand/60"
       )}
     >
       <input {...getInputProps()} />
       <div
         className={cn(
-        compact ? "dropzone-icon mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-all duration-300" : "dropzone-icon mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-all duration-300",
-          isImporting ? "scale-105" : dragActive ? "scale-110 rotate-3" : "group-hover:-translate-y-1"
+          "dropzone-icon mb-5 flex h-14 w-14 items-center justify-center rounded-lg border border-brand/15 bg-brand-soft text-brand-strong sm:h-16 sm:w-16",
+          dragActive && "bg-brand text-brand-foreground"
         )}
       >
         {isImporting ? (
@@ -316,29 +369,33 @@ export function ImageDropzone({
           <UploadCloud className="h-8 w-8" />
         )}
       </div>
-      <h2 className={cn("font-bold tracking-tight", compact ? "text-xl" : "text-xl")}>
+      <h2 className="text-[24px] font-semibold leading-tight tracking-[-0.03em] text-foreground sm:text-[27px]">
         {isImporting
           ? `Carregando ${importingCount} ${importingCount === 1 ? "imagem" : "imagens"}...`
           : dragActive
             ? "Pode soltar suas imagens"
-            : "Solte imagens aqui"}
+            : "Solte suas imagens aqui"}
       </h2>
-      <p className={cn("mt-2 max-w-lg leading-relaxed text-muted-foreground", compact ? "text-sm" : "text-sm")}>
+      <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
         {disabled
           ? "Aguarde a conclusão do processamento para adicionar arquivos."
           : isImporting
             ? "Preparando os arquivos para exibir na lista. Isso pode levar alguns segundos."
-            : "JPG, PNG, WEBP e AVIF · Processamento local"}
+            : "Arraste arquivos para esta área ou escolha no seu dispositivo."}
       </p>
       <button
         type="button"
         onClick={chooseFiles}
         disabled={isImporting || disabled}
-        className={cn("animate-shimmer inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 bg-[length:180%_100%] font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-[background-position,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:bg-[position:100%_0] hover:shadow-xl hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60", compact ? "mt-5 h-11 px-5 text-sm" : "mt-6 h-11 px-5 text-sm")}
+        className="mt-7 inline-flex h-11 items-center gap-2 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition-[background-color,transform] duration-200 hover:bg-brand hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60"
       >
         {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
         {isImporting ? "Carregando..." : "Escolher arquivos"}
       </button>
+      <div className="absolute inset-x-6 bottom-5 hidden items-center justify-between border-t border-foreground/10 pt-4 text-[11px] font-medium text-muted-foreground sm:flex sm:inset-x-8">
+        <span>JPG · PNG · WebP · AVIF</span>
+        <span>Processamento local</span>
+      </div>
     </section>
   );
 }

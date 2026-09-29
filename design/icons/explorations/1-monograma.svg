@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Direção: tipográfica suíça. Um "C" pesado segura um quadro reduzido. -->
+  <rect width="1024" height="1024" rx="228" fill="#F2EDE4"/>
+  <g transform="translate(28 0)">
+    <path d="M703.5 351.3 A250 250 0 1 0 703.5 672.7" fill="none" stroke="#141414" stroke-width="176"/>
+    <rect x="424" y="424" width="176" height="176" fill="#E8452C"/>
+    <path d="M424 600 L500 516 L584 600 Z" fill="#F2EDE4"/>
+    <circle cx="560" cy="466" r="20" fill="#F2EDE4"/>
+  </g>
+</svg>

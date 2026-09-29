@@ -14,14 +14,14 @@ export type Notice = {
 };
 
 const TONE_STYLES: Record<NoticeTone, { container: string; icon: typeof Info }> = {
-  success: { container: "border-emerald-200 text-emerald-900", icon: CircleCheck },
-  error: { container: "border-rose-200 text-rose-900", icon: CircleAlert },
-  info: { container: "border-blue-200 text-blue-900", icon: Info }
+  success: { container: "border-success/30 text-foreground", icon: CircleCheck },
+  error: { container: "border-destructive/30 text-foreground", icon: CircleAlert },
+  info: { container: "border-foreground/20 text-foreground", icon: Info }
 };
 
 function NoticeItem({ notice, onDismiss }: { notice: Notice; onDismiss: (id: string) => void }) {
   const { container, icon: Icon } = TONE_STYLES[notice.tone];
-  const iconColor = notice.tone === "success" ? "text-emerald-600" : notice.tone === "error" ? "text-rose-600" : "text-blue-600";
+  const iconColor = notice.tone === "success" ? "text-success" : notice.tone === "error" ? "text-destructive" : "text-brand";
 
   useEffect(() => {
     const timeout = window.setTimeout(() => onDismiss(notice.id), notice.tone === "error" ? 9000 : 5000);
@@ -32,7 +32,7 @@ function NoticeItem({ notice, onDismiss }: { notice: Notice; onDismiss: (id: str
     <div
       role={notice.tone === "error" ? "alert" : "status"}
       className={cn(
-        "animate-enter pointer-events-auto flex items-start gap-3 rounded-xl border bg-white px-4 py-3 text-sm shadow-lg shadow-slate-900/10",
+        "animate-enter pointer-events-auto flex items-start gap-3 rounded-md border bg-card px-4 py-3 text-sm shadow-lg shadow-foreground/10",
         container
       )}
     >
@@ -42,7 +42,7 @@ function NoticeItem({ notice, onDismiss }: { notice: Notice; onDismiss: (id: str
         type="button"
         aria-label="Fechar aviso"
         onClick={() => onDismiss(notice.id)}
-        className="shrink-0 rounded text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="shrink-0 rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <X className="h-4 w-4" />
       </button>

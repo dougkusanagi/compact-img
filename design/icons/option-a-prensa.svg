@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="mt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#1E40AF"/>
+    </linearGradient>
+    <clipPath id="card"><rect x="340" y="300" width="344" height="424" rx="56"/></clipPath>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+  <!-- foto -->
+  <rect x="340" y="300" width="344" height="424" rx="56" fill="#FFFFFF"/>
+  <g clip-path="url(#card)">
+    <path d="M340 724 L340 610 L450 480 L530 575 L590 510 L684 620 L684 724 Z" fill="url(#mt)"/>
+  </g>
+  <circle cx="440" cy="400" r="44" fill="#34D399"/>
+  <!-- prensas -->
+  <g fill="none" stroke="#4ADE80" stroke-width="88" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="150,352 260,512 150,672"/>
+    <polyline points="874,352 764,512 874,672"/>
+  </g>
+</svg>

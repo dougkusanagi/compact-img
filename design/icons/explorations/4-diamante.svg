@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Direção: joia low-poly. Pressão transforma em algo menor e mais valioso. -->
+  <defs>
+    <radialGradient id="glow" cx="0.5" cy="0.45" r="0.6">
+      <stop offset="0" stop-color="#1E2A44"/>
+      <stop offset="1" stop-color="#07090F"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#glow)"/>
+  <g stroke="#07090F" stroke-width="6" stroke-linejoin="round">
+    <!-- coroa -->
+    <polygon points="392,300 632,300 512,420" fill="#A5F3FC"/>
+    <polygon points="392,300 232,420 372,420" fill="#67E8F9"/>
+    <polygon points="392,300 372,420 512,420" fill="#C7F9FF"/>
+    <polygon points="632,300 512,420 652,420" fill="#7DD3FC"/>
+    <polygon points="632,300 652,420 792,420" fill="#38BDF8"/>
+    <!-- pavilhão -->
+    <polygon points="232,420 372,420 512,800" fill="#22D3EE"/>
+    <polygon points="372,420 512,420 512,800" fill="#0EA5E9"/>
+    <polygon points="512,420 652,420 512,800" fill="#6366F1"/>
+    <polygon points="652,420 792,420 512,800" fill="#8B5CF6"/>
+  </g>
+  <path d="M780 190 Q788 246 844 254 Q788 262 780 318 Q772 262 716 254 Q772 246 780 190 Z" fill="#FFFFFF"/>
+</svg>
