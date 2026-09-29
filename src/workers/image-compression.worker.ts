@@ -51,8 +51,10 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       quality: settings.outputFormat === "png" ? undefined : settings.quality / 100
     });
 
-    if (blob.type !== MIME_BY_FORMAT[settings.outputFormat] && settings.outputFormat === "avif") {
-      throw new Error("Seu navegador nao conseguiu gerar AVIF. Tente JPG, WEBP ou PNG.");
+    // Alguns navegadores devolvem PNG quando nao sabem codificar o formato pedido.
+    if (settings.outputFormat !== "png" && blob.type !== MIME_BY_FORMAT[settings.outputFormat]) {
+      const label = settings.outputFormat === "jpeg" ? "JPG" : settings.outputFormat.toUpperCase();
+      throw new Error(`Seu navegador nao conseguiu gerar ${label}. Tente outro formato.`);
     }
 
     const response: WorkerResponse = {

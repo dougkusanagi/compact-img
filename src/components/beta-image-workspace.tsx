@@ -551,6 +551,7 @@ function QueuePanel({
                     {image.compressedBlob ? ` → ${formatBytes(image.compressedBlob.size)}` : ""}
                   </span>
                   {image.error ? <span className="mt-1 block truncate text-[10px] text-rose-700" title={image.error}>{image.error}</span> : null}
+                  {image.downloadError ? <span className="mt-1 block truncate text-[10px] text-rose-700" title={image.downloadError}>{image.downloadError}</span> : null}
                 </span>
                 <span className="hidden shrink-0 sm:inline-flex"><StatusPill status={image.status} /></span>
                 {reduction !== undefined ? <span className="hidden w-14 shrink-0 text-right text-xs font-semibold tabular-nums text-emerald-700 md:block">−{formatPercent(reduction)}</span> : null}

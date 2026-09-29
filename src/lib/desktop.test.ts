@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildSiblingDestinationPath, buildSubfolderDestinationPath } from "./desktop";
+import { buildSiblingDestinationPath, buildSubfolderDestinationPath, getParentDirectory } from "./desktop";
 
 describe("desktop destination paths", () => {
   test("preserves Linux separators when creating a subfolder destination", () => {
@@ -30,5 +30,17 @@ describe("desktop destination paths", () => {
     expect(buildSiblingDestinationPath("/tmp/original.png", "original-compactado.webp")).toBe(
       "/tmp/original-compactado.webp"
     );
+  });
+});
+
+describe("getParentDirectory", () => {
+  test("returns the folder of a Linux path", () => {
+    expect(getParentDirectory("/home/servidor/fotos/imagens-compactadas/a.webp")).toBe(
+      "/home/servidor/fotos/imagens-compactadas"
+    );
+  });
+
+  test("returns the folder of a Windows path", () => {
+    expect(getParentDirectory("C:\\Users\\douglas\\a.webp")).toBe("C:\\Users\\douglas");
   });
 });

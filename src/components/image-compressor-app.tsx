@@ -17,14 +17,17 @@ import {
   chooseDirectory,
   chooseSavePath,
   buildSubfolderDestinationPath,
-  compressNativeJpeg,
+  compressNativeImage,
+  getParentDirectory,
   normalizeSubfolderName,
   isDesktopApp,
   joinPath,
+  readNativeImageDimensions,
   saveCompressedImage
 } from "@/lib/desktop";
 import { getReduction, replaceExtension } from "@/lib/utils";
 import { BetaImageWorkspace } from "@/components/beta-image-workspace";
+import { NoticeToaster, type Notice, type NoticeTone } from "@/components/notice-toaster";
 
 const DEFAULT_SETTINGS: CompressionSettings = {
   preserveOriginalDimensions: false,
@@ -46,6 +49,15 @@ const DEFAULT_DOWNLOAD_PREFERENCES: DownloadPreferences = {
   subfolderName: ""
 };
 const WORKER_TIMEOUT_MS = 30000;
+
+type SaveOutcome =
+  | { status: "saved"; path?: string }
+  | { status: "failed"; message: string }
+  | { status: "cancelled" };
+
+function pluralizeImages(count: number) {
+  return count === 1 ? "1 imagem" : `${count} imagens`;
+}
 
 type BatchSummaryAccumulator = QueueSummary & {
   reductionTotal: number;
@@ -69,21 +81,24 @@ function getProcessingConcurrency(
       ? navigator.hardwareConcurrency
       : 4;
 
-  const maxConcurrency = shouldUseNativeJpegCompression(settings, isDesktop, "native-jpeg")
-    ? settings.jpegCompressionMode === "fast"
+  // O Rust processa cada imagem em uma thread propria (o AVIF ja usa varias threads
+  // internamente). O teto de 4 limita a memoria de fotos grandes em paralelo.
+  const maxConcurrency = isDesktop
+    ? settings.outputFormat === "avif"
       ? 2
-      : 1
+      : Math.min(4, Math.max(1, Math.floor(hardwareConcurrency / 2)))
     : 4;
 
-  return Math.min(totalImages, Math.max(1, Math.min(maxConcurrency, hardwareConcurrency - 1 || 1)));
+  return Math.max(1, Math.min(totalImages, maxConcurrency, Math.max(1, hardwareConcurrency - 1)));
 }
 
-function shouldUseNativeJpegCompression(
-  settings: CompressionSettings,
-  isDesktop: boolean,
-  sourcePath?: string
-) {
-  return isDesktop && Boolean(sourcePath) && settings.outputFormat === "jpeg";
+function shouldUseNativeCompression(isDesktop: boolean, sourcePath?: string) {
+  return isDesktop && Boolean(sourcePath);
+}
+
+function getWorkerTimeoutMs(file: File) {
+  // Imagens grandes e formatos lentos (AVIF) precisam de mais tempo que o piso de 30s.
+  return WORKER_TIMEOUT_MS + Math.ceil(file.size / (1024 * 1024)) * 5000;
 }
 
 function compressInWorker(file: File, id: string, settings: CompressionSettings) {
@@ -100,7 +115,7 @@ function compressInWorker(file: File, id: string, settings: CompressionSettings)
       settled = true;
       worker.terminate();
       reject(new CompressionTimeoutError());
-    }, WORKER_TIMEOUT_MS);
+    }, getWorkerTimeoutMs(file));
 
     const finalize = () => {
       if (settled) {
@@ -152,8 +167,8 @@ async function compressImage(
   settings: CompressionSettings,
   isDesktop: boolean
 ) {
-  if (shouldUseNativeJpegCompression(settings, isDesktop, image.sourcePath)) {
-    return compressNativeJpeg({
+  if (shouldUseNativeCompression(isDesktop, image.sourcePath)) {
+    return compressNativeImage({
       id: image.id,
       sourcePath: image.sourcePath as string,
       settings
@@ -185,12 +200,26 @@ export function ImageCompressorApp() {
   const [downloadPreferences, setDownloadPreferences] = useState<DownloadPreferences>(DEFAULT_DOWNLOAD_PREFERENCES);
   const [lastQueueSummary, setLastQueueSummary] = useState<QueueSummary>();
   const [autoDownloadSettled, setAutoDownloadSettled] = useState(0);
+  const [notices, setNotices] = useState<Notice[]>([]);
   const imagesRef = useRef<QueueImage[]>([]);
   const cancelRequestedRef = useRef(false);
   const autoDownloadAttemptedRef = useRef<Set<string>>(new Set());
   const autoDownloadInFlightRef = useRef<Set<string>>(new Set());
+  const autoDownloadResultRef = useRef({ saved: 0, failed: 0, lastDirectory: undefined as string | undefined });
+  const noticeSeqRef = useRef(0);
   const batchSummaryRef = useRef<BatchSummaryAccumulator | null>(null);
   const deferredImages = useDeferredValue(images);
+
+  const pushNotice = useCallback((tone: NoticeTone, message: string, key?: string) => {
+    noticeSeqRef.current += 1;
+    const seq = noticeSeqRef.current;
+    const id = key ?? `notice-${seq}`;
+    setNotices((current) => [...current.filter((notice) => notice.id !== id), { id, seq, tone, message }].slice(-4));
+  }, []);
+
+  const dismissNotice = useCallback((id: string) => {
+    setNotices((current) => current.filter((notice) => notice.id !== id));
+  }, []);
 
   const updateImages = useCallback((updater: (current: QueueImage[]) => QueueImage[]) => {
     startTransition(() => {
@@ -272,7 +301,9 @@ export function ImageCompressorApp() {
     setLastQueueSummary(undefined);
 
     nextImages.forEach((image) => {
-      readImageDimensions(image.file)
+      (isDesktop && image.sourcePath
+        ? readNativeImageDimensions(image.sourcePath).catch(() => readImageDimensions(image.file))
+        : readImageDimensions(image.file))
         .then((dimensions) => {
           updateImages((current) =>
             current.map((item) => (item.id === image.id ? { ...item, originalDimensions: dimensions } : item))
@@ -288,7 +319,7 @@ export function ImageCompressorApp() {
           );
         });
     });
-  }, [updateImages]);
+  }, [isDesktop, updateImages]);
 
   const removeImage = useCallback((id: string) => {
     imagesRef.current = imagesRef.current.filter((image) => image.id !== id);
@@ -336,6 +367,8 @@ export function ImageCompressorApp() {
     cancelRequestedRef.current = false;
     autoDownloadAttemptedRef.current.clear();
     autoDownloadInFlightRef.current.clear();
+    autoDownloadResultRef.current = { saved: 0, failed: 0, lastDirectory: undefined };
+    dismissNotice("auto-download");
     batchSummaryRef.current = {
       totalCount: images.length,
       completedCount: 0,
@@ -465,11 +498,22 @@ export function ImageCompressorApp() {
             : undefined
         });
       }
+      if (cancelRequestedRef.current && batchSummary) {
+        pushNotice(
+          "info",
+          `Compactação cancelada. ${batchSummary.completedCount} de ${batchSummary.totalCount} imagens foram concluídas.`
+        );
+      } else if (batchSummary?.errorCount) {
+        pushNotice(
+          "error",
+          `${pluralizeImages(batchSummary.errorCount)} não ${batchSummary.errorCount === 1 ? "pôde" : "puderam"} ser compactada${batchSummary.errorCount === 1 ? "" : "s"}. Veja o erro em cada item da lista.`
+        );
+      }
       cancelRequestedRef.current = false;
       setIsCancelRequested(false);
       setIsProcessing(false);
     }
-  }, [images, isDesktop, isProcessing, settings, updateImages]);
+  }, [dismissNotice, images, isDesktop, isProcessing, pushNotice, settings, updateImages]);
 
   const cancelProcessing = useCallback(() => {
     if (!isProcessing || cancelRequestedRef.current) {
@@ -480,58 +524,69 @@ export function ImageCompressorApp() {
     setIsCancelRequested(true);
   }, [isProcessing]);
 
-  const downloadImage = useCallback(async (id: string, options?: { deferRemoval?: boolean }) => {
+  const saveImage = useCallback(async (
+    id: string,
+    options?: { deferRemoval?: boolean; silent?: boolean }
+  ): Promise<SaveOutcome> => {
     const image = imagesRef.current.find((item) => item.id === id);
     if (!image?.compressedBlob || !image.compressedName) {
-      return;
+      return { status: "cancelled" };
     }
 
     try {
+      let savedPath: string | undefined;
+
       if (!isDesktop) {
         await downloadBlob(image.compressedBlob, image.compressedName, {
           chooseLocation: downloadPreferences.mode === "choose-location"
         });
-        if (downloadPreferences.removeAfterDownload && !options?.deferRemoval) {
-          removeDownloadedImages([id]);
+      } else {
+        const mustChooseLocation = downloadPreferences.mode === "choose-location" || !image.sourcePath;
+        let destinationPath: string | undefined;
+        if (mustChooseLocation) {
+          destinationPath = (await chooseSavePath(image.sourcePath, image.compressedName)) ?? undefined;
+        } else if (downloadPreferences.saveInSubfolder && image.sourcePath) {
+          destinationPath = buildSubfolderDestinationPath(
+            image.sourcePath,
+            normalizeSubfolderName(downloadPreferences.subfolderName),
+            image.compressedName
+          );
         }
-        return;
-      }
 
-      const mustChooseLocation = downloadPreferences.mode === "choose-location" || !image.sourcePath;
-      let destinationPath: string | undefined;
-      if (mustChooseLocation) {
-        destinationPath = (await chooseSavePath(image.sourcePath, image.compressedName)) ?? undefined;
-      } else if (downloadPreferences.saveInSubfolder && image.sourcePath) {
-        destinationPath = buildSubfolderDestinationPath(
-          image.sourcePath,
-          normalizeSubfolderName(downloadPreferences.subfolderName),
-          image.compressedName
-        );
-      }
+        if (mustChooseLocation && !destinationPath) {
+          return { status: "cancelled" };
+        }
 
-      if (mustChooseLocation && !destinationPath) {
-        return;
+        savedPath = await saveCompressedImage({
+          blob: image.compressedBlob,
+          fileName: image.compressedName,
+          sourcePath: image.sourcePath,
+          destinationPath: destinationPath ?? undefined
+        });
       }
-
-      const savedPath = await saveCompressedImage({
-        blob: image.compressedBlob,
-        fileName: image.compressedName,
-        sourcePath: image.sourcePath,
-        destinationPath: destinationPath ?? undefined
-      });
 
       if (downloadPreferences.removeAfterDownload && !options?.deferRemoval) {
         removeDownloadedImages([id]);
-      } else {
+      } else if (savedPath) {
         updateImages((current) => current.map((item) =>
           item.id === id ? { ...item, savedPath, downloadError: undefined } : item
         ));
       }
+
+      if (!options?.silent) {
+        pushNotice(
+          "success",
+          savedPath
+            ? `${image.compressedName} salva em ${getParentDirectory(savedPath)}.`
+            : `Download de ${image.compressedName} iniciado.`
+        );
+      }
+      return { status: "saved", path: savedPath };
     } catch (error) {
       if (isAbortError(error)) {
-        return;
+        return { status: "cancelled" };
       }
-      const message = error instanceof Error ? error.message : "Nao foi possivel baixar a imagem compactada.";
+      const message = error instanceof Error ? error.message : typeof error === "string" ? error : "Nao foi possivel baixar a imagem compactada.";
       updateImages((current) =>
         current.map((item) =>
           item.id === id
@@ -539,8 +594,16 @@ export function ImageCompressorApp() {
             : item
         )
       );
+      if (!options?.silent) {
+        pushNotice("error", `Não foi possível salvar ${image.compressedName}: ${message}`);
+      }
+      return { status: "failed", message };
     }
-  }, [downloadPreferences, isDesktop, removeDownloadedImages, updateImages]);
+  }, [downloadPreferences, isDesktop, pushNotice, removeDownloadedImages, updateImages]);
+
+  const downloadImage = useCallback(async (id: string) => {
+    await saveImage(id);
+  }, [saveImage]);
 
   const downloadAllWeb = useCallback(async (format: "individual" | "zip") => {
     const readyImages = imagesRef.current.filter(
@@ -566,6 +629,14 @@ export function ImageCompressorApp() {
       if (downloadPreferences.removeAfterDownload) {
         removeDownloadedImages(downloadedIds);
       }
+      if (downloadedIds.length) {
+        pushNotice(
+          "success",
+          format === "zip"
+            ? `ZIP com ${pluralizeImages(downloadedIds.length)} baixado.`
+            : `${pluralizeImages(downloadedIds.length)} baixada${downloadedIds.length === 1 ? "" : "s"}.`
+        );
+      }
     } catch (error) {
       if (isAbortError(error)) {
         return;
@@ -575,8 +646,9 @@ export function ImageCompressorApp() {
       updateImages((current) => current.map((image) =>
         readyIds.has(image.id) ? { ...image, downloadError: message } : image
       ));
+      pushNotice("error", message);
     }
-  }, [downloadPreferences, removeDownloadedImages, updateImages]);
+  }, [downloadPreferences, pushNotice, removeDownloadedImages, updateImages]);
 
   const downloadAllDesktop = useCallback(async () => {
     const readyImages = imagesRef.current.filter(
@@ -595,6 +667,10 @@ export function ImageCompressorApp() {
         return; // Usuário cancelou a seleção da pasta
       }
     }
+
+    let savedCount = 0;
+    let failedCount = 0;
+    let lastDirectory: string | undefined;
 
     for (const image of readyImages) {
       if (!image.compressedBlob || !image.compressedName) {
@@ -629,6 +705,8 @@ export function ImageCompressorApp() {
           sourcePath: image.sourcePath,
           destinationPath
         });
+        savedCount += 1;
+        lastDirectory = getParentDirectory(savedPath);
 
         if (downloadPreferences.removeAfterDownload) {
           removeDownloadedImages([image.id]);
@@ -638,13 +716,26 @@ export function ImageCompressorApp() {
           ));
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Não foi possível baixar a imagem compactada.";
+        failedCount += 1;
+        const message = error instanceof Error ? error.message : typeof error === "string" ? error : "Não foi possível baixar a imagem compactada.";
         updateImages((current) =>
           current.map((item) => (item.id === image.id ? { ...item, downloadError: message } : item))
         );
       }
     }
-  }, [downloadPreferences, removeDownloadedImages, updateImages]);
+
+    if (failedCount) {
+      pushNotice(
+        "error",
+        `${pluralizeImages(failedCount)} não ${failedCount === 1 ? "foi salva" : "foram salvas"}${savedCount ? `; ${pluralizeImages(savedCount)} ${savedCount === 1 ? "foi salva" : "foram salvas"}` : ""}. Veja o erro em cada item da lista.`
+      );
+    } else if (savedCount) {
+      pushNotice(
+        "success",
+        `${pluralizeImages(savedCount)} ${savedCount === 1 ? "salva" : "salvas"}${batchDirectory || savedCount === 1 ? ` em ${batchDirectory ?? lastDirectory}` : ""}.`
+      );
+    }
+  }, [downloadPreferences, pushNotice, removeDownloadedImages, updateImages]);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -667,12 +758,30 @@ export function ImageCompressorApp() {
     readyImages.forEach((image) => {
       autoDownloadAttemptedRef.current.add(image.id);
       autoDownloadInFlightRef.current.add(image.id);
-      void downloadImage(image.id, { deferRemoval: true }).finally(() => {
+      void saveImage(image.id, { deferRemoval: true, silent: true }).then((outcome) => {
+        const result = autoDownloadResultRef.current;
+        if (outcome.status === "cancelled") {
+          return;
+        }
+        if (outcome.status === "saved") {
+          result.saved += 1;
+          result.lastDirectory = outcome.path ? getParentDirectory(outcome.path) : result.lastDirectory;
+        } else {
+          result.failed += 1;
+        }
+        const savedText = result.saved
+          ? `${pluralizeImages(result.saved)} ${result.saved === 1 ? "salva" : "salvas"} automaticamente${result.saved === 1 && result.lastDirectory ? ` em ${result.lastDirectory}` : ""}.`
+          : "";
+        const failedText = result.failed
+          ? `${pluralizeImages(result.failed)} não ${result.failed === 1 ? "foi salva" : "foram salvas"}. Veja o erro em cada item da lista.`
+          : "";
+        pushNotice(result.failed ? "error" : "success", [savedText, failedText].filter(Boolean).join(" "), "auto-download");
+      }).finally(() => {
         autoDownloadInFlightRef.current.delete(image.id);
         setAutoDownloadSettled((value) => value + 1);
       });
     });
-  }, [downloadImage, downloadPreferences.autoDownload, downloadPreferences.mode, images, isDesktop]);
+  }, [downloadPreferences.autoDownload, downloadPreferences.mode, images, isDesktop, pushNotice, saveImage]);
 
   useEffect(() => {
     if (
@@ -710,14 +819,18 @@ export function ImageCompressorApp() {
       if (started && downloadPreferences.removeAfterDownload) {
         removeDownloadedImages(readyIds);
       }
+      if (started) {
+        pushNotice("success", `ZIP com ${pluralizeImages(readyIds.length)} baixado automaticamente.`);
+      }
     }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : "Não foi possível baixar o ZIP automaticamente.";
       const readyIdSet = new Set(readyIds);
       updateImages((current) => current.map((image) =>
         readyIdSet.has(image.id) ? { ...image, downloadError: message } : image
       ));
+      pushNotice("error", message);
     });
-  }, [downloadPreferences, images, isDesktop, isProcessing, removeDownloadedImages, updateImages]);
+  }, [downloadPreferences, images, isDesktop, isProcessing, pushNotice, removeDownloadedImages, updateImages]);
 
   useEffect(() => {
     const hasUnfinishedImages = images.some((image) => image.status === "pending" || image.status === "processing");
@@ -803,6 +916,7 @@ export function ImageCompressorApp() {
           onDownloadAllDesktop={downloadAllDesktop}
           onDownloadAllWeb={downloadAllWeb}
       />
+      <NoticeToaster notices={notices} onDismiss={dismissNotice} />
     </main>
   );
 }
