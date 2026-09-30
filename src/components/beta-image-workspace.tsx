@@ -104,11 +104,11 @@ function SettingField({
     <div className={cn("grid gap-2", className)}>
       <div className="flex min-h-5 items-center justify-between gap-2">
         {htmlFor ? (
-          <Label htmlFor={htmlFor} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Label htmlFor={htmlFor} className="text-[13px] font-semibold text-muted-foreground">
             {label}
           </Label>
         ) : (
-          <span id={labelId} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <span id={labelId} className="text-[13px] font-semibold text-muted-foreground">
             {label}
           </span>
         )}
@@ -317,38 +317,24 @@ function OutputSettings({
                 onCheckedChange={(checked) => update("stripMetadata", checked)}
               />
             ) : null}
-            <SettingField label="Destino do download" htmlFor="beta-download-mode">
-              <div className="relative">
-                <select
-                  id="beta-download-mode"
-                  value={downloadPreferences.mode}
-                  disabled={disabled}
-                  onChange={(event) => updateDownload("mode", event.target.value as DownloadPreferences["mode"])}
-                  className="h-9 w-full appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm outline-none transition-[border-color,box-shadow] duration-200 hover:border-foreground/40 focus:border-foreground focus:ring-2 focus:ring-ring/25 disabled:opacity-50"
-                >
-                  <option value="same-folder">{isDesktop ? "Mesma pasta" : "Pasta de downloads"}</option>
-                  <option value="choose-location">Escolher local ao salvar</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              </div>
-            </SettingField>
-            {downloadPreferences.mode === "same-folder" ? (
-              <>
-                <PreferenceToggle
-                  id="beta-auto-download"
-                  label={isDesktop ? "Baixar ao concluir" : "Baixar ZIP ao concluir"}
-                  checked={downloadPreferences.autoDownload}
-                  disabled={disabled}
-                  onCheckedChange={(checked) => updateDownload("autoDownload", checked)}
-                />
-                <PreferenceToggle
-                  id="beta-remove-downloaded"
-                  label="Remover da fila após baixar"
-                  checked={downloadPreferences.removeAfterDownload}
-                  disabled={disabled}
-                  onCheckedChange={(checked) => updateDownload("removeAfterDownload", checked)}
-                />
-                <div className="grid gap-2 rounded-md bg-muted/50 px-3 py-2.5">
+            <div role="group" aria-label="Local de salvamento" className="grid gap-2.5 rounded-md bg-muted/50 px-3 py-2.5">
+              <SettingField label="Destino do download" htmlFor="beta-download-mode">
+                <div className="relative">
+                  <select
+                    id="beta-download-mode"
+                    value={downloadPreferences.mode}
+                    disabled={disabled}
+                    onChange={(event) => updateDownload("mode", event.target.value as DownloadPreferences["mode"])}
+                    className="h-9 w-full appearance-none rounded-md border border-input bg-card pl-3 pr-9 text-sm outline-none transition-[border-color,box-shadow] duration-200 hover:border-foreground/40 focus:border-foreground focus:ring-2 focus:ring-ring/25 disabled:opacity-50"
+                  >
+                    <option value="same-folder">{isDesktop ? "Mesma pasta" : "Pasta de downloads"}</option>
+                    <option value="choose-location">Escolher local ao salvar</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                </div>
+              </SettingField>
+              {downloadPreferences.mode === "same-folder" ? (
+                <div className="grid gap-2 border-t border-border/70 pt-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <Label htmlFor="beta-subfolder" className="text-[13px] font-medium leading-snug text-foreground/80">
                       Salvar em subpasta
@@ -370,8 +356,26 @@ function OutputSettings({
                       aria-label="Nome da subpasta"
                       className="h-9 bg-card"
                     />
-                  ) : null}
-                </div>
+                ) : null}
+              </div>
+              ) : null}
+            </div>
+            {downloadPreferences.mode === "same-folder" ? (
+              <>
+                <PreferenceToggle
+                  id="beta-auto-download"
+                  label={isDesktop ? "Baixar ao concluir" : "Baixar ZIP ao concluir"}
+                  checked={downloadPreferences.autoDownload}
+                  disabled={disabled}
+                  onCheckedChange={(checked) => updateDownload("autoDownload", checked)}
+                />
+                <PreferenceToggle
+                  id="beta-remove-downloaded"
+                  label="Remover da fila após baixar"
+                  checked={downloadPreferences.removeAfterDownload}
+                  disabled={disabled}
+                  onCheckedChange={(checked) => updateDownload("removeAfterDownload", checked)}
+                />
               </>
             ) : null}
           </div>

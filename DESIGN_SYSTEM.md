@@ -39,7 +39,7 @@ Use transições de 180 a 300 ms nos controles, e até 500 ms em entradas ou mud
 ## Diretrizes de uso
 
 - Use a ação preta para apenas uma ação dominante por região. O vermelhão é acento: use-o em pequenas doses (hover da ação, progresso, item selecionado, ícone de destaque) e nunca em blocos grandes de texto; para texto em vermelhão use `--brand-strong`.
-- Rótulos de campo usam caixa alta pequena com espaçamento (`text-[11px] uppercase tracking-wider`).
+- Rótulos de campo usam caixa de frase, com inicial maiúscula e siglas preservadas (como “Tamanho máximo” e “Modo JPG”), em 13px e sem espaçamento adicional entre letras.
 - Mantenha texto funcional com contraste alto; use tons suaves em bordas, fundos e ornamentos.
 - Em layouts pequenos, empilhe painéis e preserve alvos de toque confortáveis.
 - Novos controles devem usar os componentes base antes de receber estilos locais.
