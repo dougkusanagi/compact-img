@@ -51,6 +51,9 @@ export type ImageWorkspaceProps = {
   isDesktop: boolean;
   processedCount: number;
   progress: number;
+  processingStartedAt?: number;
+  lifetimeStats?: { images: number; savedBytes: number };
+  estimates?: { outputBytes: number; sampleCount: number; samples: Record<string, number> };
   invalidFiles: string[];
   onInvalidFiles: (names: string[]) => void;
   onFiles: (files: SelectedImage[]) => void;
@@ -201,6 +204,18 @@ export function OutputSettings({
           </SettingField>
         </fieldset>
 
+        <SettingField label="Compressão" labelId="compression-mode-label">
+          <SegmentedControl ariaLabelledBy="compression-mode-label" disabled={disabled} value={settings.compressionMode ?? "quality"}
+            options={[{ value: "quality", label: "Qualidade" }, { value: "target-size", label: "Peso máximo" }]}
+            onChange={(value) => update("compressionMode", value)} />
+        </SettingField>
+        {settings.compressionMode === "target-size" ? <SettingField label="Peso máximo por imagem (KB)" htmlFor="max-file-size">
+          <Input id="max-file-size" type="number" min={1} max={102400} value={settings.maxFileSizeKB ?? 300} disabled={disabled}
+            onChange={(event) => update("maxFileSizeKB", Math.min(102400, Math.max(1, Number(event.target.value) || 1)))} />
+          <div className="mt-2 flex flex-wrap gap-2">{[100, 200, 300, 500, 1000].map((size) => <button key={size} type="button" disabled={disabled}
+            aria-pressed={settings.maxFileSizeKB === size} onClick={() => update("maxFileSizeKB", size)} className="rounded-md border border-input px-2 py-1 text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">{size} KB</button>)}</div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Ajusta a qualidade para respeitar o limite. Se necessário, reduz as dimensões; com tamanho Original, avisa se o limite não puder ser atingido.{settings.outputFormat === "png" ? " PNG mantém a qualidade e reduz somente as dimensões." : ""}</p>
+        </SettingField> : <>
         <SettingField
           label="Qualidade"
           htmlFor="classic-quality"
@@ -222,6 +237,7 @@ export function OutputSettings({
             className="py-1"
           />
         </SettingField>
+        </>}
 
         <SettingField
           label="Tamanho máximo"
@@ -310,6 +326,20 @@ export function OutputSettings({
             <ChevronDown className="h-4 w-4 text-muted-foreground/70 transition-transform group-open:rotate-180" />
           </summary>
           <div className="grid gap-2.5 pt-4">
+            <SettingField label="Se o arquivo já existir" htmlFor="file-conflict-policy">
+              <select id="file-conflict-policy" value={downloadPreferences.conflictPolicy ?? "ask"} disabled={disabled}
+                onChange={(event) => updateDownload("conflictPolicy", event.target.value as DownloadPreferences["conflictPolicy"])}
+                className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+                <option value="ask">Perguntar</option><option value="rename">Manter os dois</option><option value="overwrite">Substituir</option><option value="skip">Pular</option>
+              </select>
+              {!isDesktop ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Estas regras se aplicam ao baixar arquivos individuais em uma pasta escolhida. No download comum e no ZIP, o navegador gerencia arquivos existentes.</p> : null}
+            </SettingField>
+            <PreferenceToggle id="keep-original" label="Manter original se a saída ficar maior" checked={settings.keepOriginalIfLarger !== false} disabled={disabled} onCheckedChange={(checked) => update("keepOriginalIfLarger", checked)} />
+            {settings.outputFormat === "jpeg" ? <SettingField label="Fundo para transparência" htmlFor="jpeg-background">
+              <div className="flex items-center gap-3"><input id="jpeg-background" type="color" value={settings.jpegBackgroundColor ?? "#ffffff"} disabled={disabled} onChange={(event) => update("jpegBackgroundColor", event.target.value)} className="h-10 w-12 rounded border border-input bg-card" /><span className="text-sm">{settings.jpegBackgroundColor ?? "#ffffff"}</span></div>
+              <p className="mt-2 text-xs text-muted-foreground">JPG não mantém transparência. As áreas transparentes recebem esta cor.</p>
+            </SettingField> : null}
+
             <div role="group" aria-label="Local de salvamento" className="grid gap-2.5 rounded-md bg-muted/50 px-3 py-2.5">
               <SettingField label="Destino do download" htmlFor="classic-download-mode">
                 <div className="relative">
@@ -415,6 +445,8 @@ function StatusPill({ status }: { status: QueueImage["status"] }) {
   const config = {
     pending: { label: "Na fila", icon: Clock3, className: "bg-muted text-muted-foreground" },
     processing: { label: "Compactando", icon: LoaderCircle, className: "bg-brand-soft text-brand-strong" },
+    kept: { label: "Original mantido", icon: CheckCircle2, className: "bg-muted text-muted-foreground" },
+    skipped: { label: "Ignorada", icon: X, className: "bg-muted text-muted-foreground" },
     done: { label: "Pronta", icon: CheckCircle2, className: "bg-success-soft text-success" },
     error: { label: "Erro", icon: X, className: "bg-destructive/10 text-destructive" }
   }[status];
@@ -607,7 +639,7 @@ function CompletedBatch({ summary, onFiles, onInvalidFiles, onClear, isDesktop }
       <div>
         <span className="flex h-10 w-10 items-center justify-center rounded-md bg-success-soft text-success"><Check className="h-5 w-5" /></span>
         <h2 className="mt-4 text-lg font-semibold text-foreground">Lote concluído</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{summary.completedCount} de {summary.totalCount} imagens prontas{summary.errorCount ? ` · ${summary.errorCount} com erro` : ""}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{summary.completedCount} de {summary.totalCount} imagens prontas{summary.keptCount ? ` · ${summary.keptCount} originais mantidos` : ""}{summary.errorCount ? ` · ${summary.errorCount} com erro` : ""}</p>
       </div>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -650,9 +682,9 @@ export function ClassicImageWorkspace(props: ImageWorkspaceProps) {
     onDownloadAllDesktop,
     onDownloadAllWeb
   } = props;
-  const isComplete = useMemo(() => images.length > 0 && images.every((image) => image.status === "done" || image.status === "error"), [images]);
+  const isComplete = useMemo(() => images.length > 0 && images.every((image) => image.status !== "pending" && image.status !== "processing"), [images]);
   const hasCompressed = images.some((image) => image.status === "done" && image.compressedBlob);
-  const hasProcessed = images.some((image) => image.status === "done" || image.status === "error");
+  const hasProcessed = images.some((image) => image.status !== "pending" && image.status !== "processing");
   const readyCount = images.filter((image) => image.status === "done" && image.compressedBlob).length;
 
   return (

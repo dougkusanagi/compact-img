@@ -73,6 +73,17 @@
 }
 
 @layer utilities {
+  .window-titlebar { pointer-events: auto; transition: background-color 200ms, color 200ms; }
+  .window-control { display: grid; width: 48px; place-items: center; color: hsl(var(--foreground) / 0.7); transition: background-color 150ms, color 150ms; }
+  .window-control svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.1; }
+  .window-control:hover:not(:disabled) { background: hsl(var(--foreground) / 0.08); color: hsl(var(--foreground)); }
+  .window-close:hover:not(:disabled) { background: hsl(var(--destructive)); color: white; }
+  .window-control:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -3px; }
+  .window-control:disabled { opacity: 0.45; }
+  body:has(.premium-viewer[data-state="open"]) .window-titlebar { background: hsl(var(--foreground)); color: hsl(var(--primary-foreground)); border-color: hsl(var(--primary-foreground) / 0.15); }
+  body:has(.premium-viewer[data-state="open"]) .window-control { color: hsl(var(--primary-foreground) / 0.75); }
+  body:has(.premium-viewer[data-state="open"]) .window-control:hover:not(:disabled) { background: hsl(var(--primary-foreground) / 0.1); color: hsl(var(--primary-foreground)); }
+  body:has(.premium-viewer[data-state="open"]) .window-close:hover:not(:disabled) { background: hsl(var(--destructive)); }
   .premium-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
     transition: background-color 180ms ease;

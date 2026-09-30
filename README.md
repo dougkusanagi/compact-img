@@ -39,8 +39,25 @@ Os arquivos permanecem na memória da sessão; recarregar a página limpa a fila
 
 O novo layout oferece presets, fila agrupada por pasta, ajustes em painel lateral,
 comparação em tela cheia e ações de processamento e download no rodapé. Os números
-exibidos vêm dos arquivos reais. Peso-alvo, estimativas antes da compactação e
-estatísticas históricas simuladas do protótipo não fazem parte desta versão.
+exibidos vêm dos arquivos reais. Inclui peso máximo por imagem, preset Catálogo
+300 KB, até seis presets (quatro de fábrica e dois salvos), fundo de transparência
+para JPG, importação de pastas e imagens coladas, navegação e zoom na comparação.
+As estimativas codificam uma amostra de até três imagens e indicam essa base;
+as estatísticas históricas registram apenas compactações realizadas neste dispositivo.
+
+O peso máximo ajusta a qualidade e, quando permitido, reduz as dimensões até
+respeitar o limite. Com dimensões originais, limites inviáveis geram erro.
+PNG ajusta somente as dimensões. Saídas maiores podem manter o original.
+
+**Se o arquivo já existir** oferece Perguntar, Manter os dois, Substituir e Pular.
+No desktop as regras são aplicadas ao salvar, com criação exclusiva para evitar
+colisões e proteção da imagem original. No navegador, valem para arquivos
+individuais em uma pasta escolhida com a API de arquivos; downloads comuns e ZIPs
+seguem as regras do navegador. Nomes repetidos dentro do ZIP são preservados.
+
+A beta usa uma barra de janela própria no desktop, com arraste, minimizar,
+maximizar/restaurar e fechar. Ao voltar ao layout Atual, a barra nativa é restaurada.
+No navegador os controles da janela ficam desativados.
 
 ## Branches
 

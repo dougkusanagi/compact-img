@@ -4,14 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDropzone } from "react-dropzone";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { ImagePlus, LoaderCircle, UploadCloud } from "lucide-react";
+import { Folder, ImagePlus, LoaderCircle, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACCEPTED_IMAGE_TYPES, isAcceptedImage } from "@/lib/image-utils";
 import {
   isAcceptedImagePath,
   isDesktopApp,
   loadImagesFromPaths,
-  selectDesktopImages
+  selectDesktopImages,
+  selectDesktopFolderImages
 } from "@/lib/desktop";
 import type { SelectedImage } from "@/lib/image-types";
 
@@ -38,6 +39,7 @@ export function ImageDropzone({
   enableNativeDragDrop = true,
   enableLocalDragDrop = true
 }: ImageDropzoneProps) {
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [isNativeDragActive, setIsNativeDragActive] = useState(false);
   const [isGlobalDragActive, setIsGlobalDragActive] = useState(false);
   const [importingCount, setImportingCount] = useState(0);
@@ -284,6 +286,25 @@ export function ImageDropzone({
     }
   }, [disabled, isDesktop, isImporting, onFiles, onInvalidFiles, open]);
 
+  const chooseFolder = async () => {
+    if (disabled || isImporting) return;
+    if (!isDesktop) { folderInputRef.current?.click(); return; }
+    setImportingCount(1);
+    try { const files = await selectDesktopFolderImages(); if (files.length) onFiles(files); else onInvalidFiles(["Nenhuma imagem encontrada na pasta."]); }
+    catch { onInvalidFiles(["Não foi possível abrir a pasta selecionada."]); }
+    finally { setImportingCount(0); }
+  };
+  const folderInput = <input ref={folderInputRef} type="file" multiple hidden aria-label="Escolher pasta de imagens" {...{ webkitdirectory: "" }} onChange={(event) => {
+    const files = Array.from(event.target.files ?? []);
+    const accepted = files.filter(isAcceptedImage);
+    const rejected = files.filter((file) => !isAcceptedImage(file));
+    if (accepted.length) onFiles(accepted.map((file) => ({ file })));
+    if (rejected.length) onInvalidFiles(rejected.map((file) => file.name));
+    event.target.value = "";
+  }} />;
+  const folderButton = <button type="button" disabled={disabled || isImporting} onClick={() => void chooseFolder()}
+    className="inline-flex h-10 items-center gap-2 rounded-md border border-input bg-card px-3 text-sm font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"><Folder className="h-4 w-4" />Escolher pasta</button>;
+
   const dragActive = isDragActive || isNativeDragActive;
   const isOverlayVisible = mode === "overlay" && (isGlobalDragActive || isNativeDragActive);
 
@@ -301,7 +322,8 @@ export function ImageDropzone({
 
   if (mode === "button") {
     return (
-      <div {...getRootProps()} className="shrink-0">
+      <div {...getRootProps()} className="flex shrink-0 flex-wrap items-center gap-2">
+        {folderInput}
         <input {...getInputProps()} />
         <button
           type="button"
@@ -312,6 +334,7 @@ export function ImageDropzone({
           {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
           {isImporting ? "Carregando..." : "Adicionar imagens"}
         </button>
+        {folderButton}
       </div>
     );
   }
@@ -358,6 +381,7 @@ export function ImageDropzone({
       )}
     >
       <input {...getInputProps()} />
+      {folderInput}
       <div
         className={cn(
           "dropzone-icon mb-5 flex h-14 w-14 items-center justify-center rounded-lg border border-brand/15 bg-brand-soft text-brand-strong sm:h-16 sm:w-16",
@@ -395,6 +419,8 @@ export function ImageDropzone({
         {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
         {isImporting ? "Carregando..." : "Escolher arquivos"}
       </button>
+      <div className="mt-3">{folderButton}</div>
+      <p className="mt-3 text-xs text-muted-foreground">Ou cole uma imagem com Ctrl V</p>
       <div className="absolute inset-x-6 bottom-5 hidden items-center justify-between border-t border-foreground/10 pt-4 text-[11px] font-medium text-muted-foreground sm:flex sm:inset-x-8">
         <span>JPG · PNG · WebP · AVIF</span>
         <span>Processamento local</span>

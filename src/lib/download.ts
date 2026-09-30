@@ -1,4 +1,5 @@
-import type { QueueImage } from "@/lib/image-types";
+import { numberedFileName, uniqueFileName } from "@/lib/file-names";
+import type { ConflictPolicy, QueueImage } from "@/lib/image-types";
 
 type BrowserWritable = {
   write: (contents: Blob) => Promise<void>;
@@ -21,6 +22,9 @@ type BrowserFileSystemWindow = Window & {
 
 type BrowserDownloadOptions = {
   chooseLocation?: boolean;
+  conflictPolicy?: ConflictPolicy;
+  onSkipped?: (id: string) => void;
+  resolveConflict?: (name: string) => Promise<"rename" | "overwrite" | "skip" | "cancel">;
 };
 
 type ZipDownloadOptions = BrowserDownloadOptions & {
@@ -76,11 +80,12 @@ export async function downloadImagesZip(images: QueueImage[], options: ZipDownlo
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   const folderName = options.subfolderName ? normalizeFolderName(options.subfolderName) : undefined;
+  const used = new Set<string>();
   readyImages.forEach((image) => {
     const fileName = folderName
       ? `${folderName}/${image.compressedName as string}`
       : image.compressedName as string;
-    zip.file(fileName, image.compressedBlob as Blob);
+    zip.file(uniqueFileName(fileName, used), image.compressedBlob as Blob);
   });
 
   const blob = await zip.generateAsync({ type: "blob" });
@@ -109,7 +114,25 @@ export async function downloadImagesIndividual(
       if (!image.compressedBlob || !image.compressedName) {
         continue;
       }
-      const fileHandle = await directory.getFileHandle(image.compressedName, { create: true });
+      let fileName = image.compressedName;
+      const exists = async (name: string) => {
+        try { await directory.getFileHandle(name, { create: false }); return true; }
+        catch (error) { if (error instanceof DOMException && error.name === "NotFoundError") return false; throw error; }
+      };
+      if (await exists(fileName)) {
+        let policy = options.conflictPolicy ?? "ask";
+        if (policy === "ask") {
+          const decision = await options.resolveConflict?.(fileName);
+          if (!decision || decision === "cancel") throw new DOMException("Salvamento cancelado", "AbortError");
+          policy = decision;
+        }
+        if (policy === "skip") { options.onSkipped?.(image.id); continue; }
+        if (policy === "rename") {
+          let index = 2;
+          while (await exists(fileName)) fileName = numberedFileName(image.compressedName, index++);
+        }
+      }
+      const fileHandle = await directory.getFileHandle(fileName, { create: true });
       await writeFileHandle(fileHandle, image.compressedBlob);
       downloadedIds.push(image.id);
     }
