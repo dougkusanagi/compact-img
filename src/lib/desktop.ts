@@ -1,6 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import type { CompressionSettings, ImageDimensions, WorkerResponse, SelectedImage } from "@/lib/image-types";
+import type { CompressionSettings, ConflictPolicy, ImageDimensions, WorkerResponse, SelectedImage } from "@/lib/image-types";
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   avif: "image/avif",
@@ -72,6 +72,8 @@ type SaveCompressedImageInput = {
   fileName: string;
   sourcePath?: string;
   destinationPath?: string;
+  conflictPolicy?: ConflictPolicy;
+  resolveConflict?: (path: string) => Promise<"rename" | "overwrite" | "skip" | "cancel">;
 };
 
 type NativeCompressionInput = {
@@ -178,17 +180,28 @@ export async function saveCompressedImage({
   blob,
   fileName,
   sourcePath,
-  destinationPath
+  destinationPath,
+  conflictPolicy = "ask",
+  resolveConflict
 }: SaveCompressedImageInput) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
 
-  return invoke<string>("save_compressed_image", bytes, {
+  const write = (policy: ConflictPolicy) => invoke<string | null>("save_compressed_image", bytes, {
     headers: {
       "x-file-name": encodeURIComponent(fileName),
+      "x-conflict-policy": policy,
       ...(sourcePath ? { "x-source-path": encodeURIComponent(sourcePath) } : {}),
       ...(destinationPath ? { "x-destination-path": encodeURIComponent(destinationPath) } : {})
     }
   });
+  try { return await write(conflictPolicy); }
+  catch (error) {
+    const message = String(error);
+    if (!message.startsWith("FILE_EXISTS:") || conflictPolicy !== "ask" || !resolveConflict) throw error;
+    const decision = await resolveConflict(message.slice("FILE_EXISTS:".length));
+    if (decision === "cancel") throw new DOMException("Salvamento cancelado", "AbortError");
+    return write(decision);
+  }
 }
 
 export async function readNativeImageDimensions(path: string): Promise<ImageDimensions> {
@@ -214,3 +227,11 @@ export async function compressNativeImage({
     finalDimensions: result.finalDimensions
   };
 }
+
+export async function selectDesktopFolderImages() {
+  const selected = await open({ directory: true, multiple: false, title: "Escolher pasta de imagens" });
+  const directory = Array.isArray(selected) ? selected[0] : selected;
+  if (!directory) return [];
+  return loadImagesFromPaths(await invoke<string[]>("list_image_paths", { directory }));
+}
+export async function openOutputFolder(path: string) { await invoke("open_output_folder", { path }); }

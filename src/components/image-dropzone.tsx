@@ -4,14 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDropzone } from "react-dropzone";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { ImagePlus, LoaderCircle, UploadCloud } from "lucide-react";
+import { Folder, ImagePlus, LoaderCircle, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACCEPTED_IMAGE_TYPES, isAcceptedImage } from "@/lib/image-utils";
 import {
   isAcceptedImagePath,
   isDesktopApp,
   loadImagesFromPaths,
-  selectDesktopImages
+  selectDesktopImages,
+  selectDesktopFolderImages
 } from "@/lib/desktop";
 import type { SelectedImage } from "@/lib/image-types";
 
@@ -20,6 +21,7 @@ type ImageDropzoneProps = {
   onInvalidFiles: (names: string[]) => void;
   isDesktop: boolean;
   compact?: boolean;
+  appearance?: "default" | "premium";
   mode?: "dropzone" | "button" | "overlay";
   disabled?: boolean;
   enableNativeDragDrop?: boolean;
@@ -31,11 +33,13 @@ export function ImageDropzone({
   onInvalidFiles,
   isDesktop,
   compact = false,
+  appearance = "default",
   mode = "dropzone",
   disabled = false,
   enableNativeDragDrop = true,
   enableLocalDragDrop = true
 }: ImageDropzoneProps) {
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [isNativeDragActive, setIsNativeDragActive] = useState(false);
   const [isGlobalDragActive, setIsGlobalDragActive] = useState(false);
   const [importingCount, setImportingCount] = useState(0);
@@ -282,6 +286,25 @@ export function ImageDropzone({
     }
   }, [disabled, isDesktop, isImporting, onFiles, onInvalidFiles, open]);
 
+  const chooseFolder = async () => {
+    if (disabled || isImporting) return;
+    if (!isDesktop) { folderInputRef.current?.click(); return; }
+    setImportingCount(1);
+    try { const files = await selectDesktopFolderImages(); if (files.length) onFiles(files); else onInvalidFiles(["Nenhuma imagem encontrada na pasta."]); }
+    catch { onInvalidFiles(["Não foi possível abrir a pasta selecionada."]); }
+    finally { setImportingCount(0); }
+  };
+  const folderInput = <input ref={folderInputRef} type="file" multiple hidden aria-label="Escolher pasta de imagens" {...{ webkitdirectory: "" }} onChange={(event) => {
+    const files = Array.from(event.target.files ?? []);
+    const accepted = files.filter(isAcceptedImage);
+    const rejected = files.filter((file) => !isAcceptedImage(file));
+    if (accepted.length) onFiles(accepted.map((file) => ({ file })));
+    if (rejected.length) onInvalidFiles(rejected.map((file) => file.name));
+    event.target.value = "";
+  }} />;
+  const folderButton = <button type="button" disabled={disabled || isImporting} onClick={() => void chooseFolder()}
+    className="inline-flex h-10 items-center gap-2 rounded-md border border-input bg-card px-3 text-sm font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"><Folder className="h-4 w-4" />Escolher pasta</button>;
+
   const dragActive = isDragActive || isNativeDragActive;
   const isOverlayVisible = mode === "overlay" && (isGlobalDragActive || isNativeDragActive);
 
@@ -299,7 +322,8 @@ export function ImageDropzone({
 
   if (mode === "button") {
     return (
-      <div {...getRootProps()} className="shrink-0">
+      <div {...getRootProps()} className="flex shrink-0 flex-wrap items-center gap-2">
+        {folderInput}
         <input {...getInputProps()} />
         <button
           type="button"
@@ -310,6 +334,7 @@ export function ImageDropzone({
           {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
           {isImporting ? "Carregando..." : "Adicionar imagens"}
         </button>
+        {folderButton}
       </div>
     );
   }
@@ -347,6 +372,7 @@ export function ImageDropzone({
       className={cn(
         "dropzone-surface group relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed bg-card px-6 py-10 text-center transition-[border-color,background-color] duration-200 sm:px-10",
         compact ? "min-h-[360px] lg:min-h-[580px]" : "min-h-80",
+        appearance === "premium" && "min-h-[480px] rounded-[20px] bg-card/55 sm:min-h-[520px]",
         isImporting || disabled
           ? "border-brand/50"
           : dragActive
@@ -355,6 +381,7 @@ export function ImageDropzone({
       )}
     >
       <input {...getInputProps()} />
+      {folderInput}
       <div
         className={cn(
           "dropzone-icon mb-5 flex h-14 w-14 items-center justify-center rounded-lg border border-brand/15 bg-brand-soft text-brand-strong sm:h-16 sm:w-16",
@@ -369,19 +396,19 @@ export function ImageDropzone({
           <UploadCloud className="h-8 w-8" />
         )}
       </div>
-      <h2 className="text-[24px] font-semibold leading-tight tracking-[-0.03em] text-foreground sm:text-[27px]">
+      <h2 className={cn("text-[24px] font-semibold leading-tight tracking-[-0.03em] text-foreground sm:text-[27px]", appearance === "premium" && "max-w-[320px] text-[30px] sm:text-[34px]")}>
         {isImporting
           ? `Carregando ${importingCount} ${importingCount === 1 ? "imagem" : "imagens"}...`
           : dragActive
             ? "Pode soltar suas imagens"
-            : "Solte suas imagens aqui"}
+            : appearance === "premium" ? "Arraste suas fotos para começar" : "Solte suas imagens aqui"}
       </h2>
       <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
         {disabled
           ? "Aguarde a conclusão do processamento para adicionar arquivos."
           : isImporting
             ? "Preparando os arquivos para exibir na lista. Isso pode levar alguns segundos."
-            : "Arraste arquivos para esta área ou escolha no seu dispositivo."}
+            : appearance === "premium" ? "Compacte dezenas de imagens de uma vez. Tudo acontece neste computador, nada é enviado." : "Arraste arquivos para esta área ou escolha no seu dispositivo."}
       </p>
       <button
         type="button"
@@ -392,6 +419,8 @@ export function ImageDropzone({
         {isImporting ? <LoaderCircle className="h-4 w-4 loading-spinner" /> : <ImagePlus className="h-4 w-4" />}
         {isImporting ? "Carregando..." : "Escolher arquivos"}
       </button>
+      <div className="mt-3">{folderButton}</div>
+      <p className="mt-3 text-xs text-muted-foreground">Ou cole uma imagem com Ctrl V</p>
       <div className="absolute inset-x-6 bottom-5 hidden items-center justify-between border-t border-foreground/10 pt-4 text-[11px] font-medium text-muted-foreground sm:flex sm:inset-x-8">
         <span>JPG · PNG · WebP · AVIF</span>
         <span>Processamento local</span>

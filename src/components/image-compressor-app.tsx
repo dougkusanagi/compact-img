@@ -26,7 +26,11 @@ import {
   saveCompressedImage
 } from "@/lib/desktop";
 import { getReduction, replaceExtension } from "@/lib/utils";
-import { BetaImageWorkspace } from "@/components/beta-image-workspace";
+import { ClassicImageWorkspace } from "@/components/classic-image-workspace";
+import { PremiumImageWorkspace } from "@/components/premium-image-workspace";
+import { useFileConflicts } from "@/components/file-conflict-dialog";
+import { LayoutSwitcher } from "@/components/layout-switcher";
+import { WindowTitlebar } from "@/components/window-titlebar";
 import { NoticeToaster, type Notice, type NoticeTone } from "@/components/notice-toaster";
 
 const DEFAULT_SETTINGS: CompressionSettings = {
@@ -38,7 +42,11 @@ const DEFAULT_SETTINGS: CompressionSettings = {
   outputFormat: "webp",
   jpegCompressionMode: "balanced",
   keepAspectRatio: true,
-  stripMetadata: true
+  stripMetadata: true,
+  compressionMode: "quality",
+  maxFileSizeKB: 300,
+  jpegBackgroundColor: "#ffffff",
+  keepOriginalIfLarger: true
 };
 const DEFAULT_DOWNLOAD_MODE: DownloadMode = "same-folder";
 const DEFAULT_DOWNLOAD_PREFERENCES: DownloadPreferences = {
@@ -46,14 +54,16 @@ const DEFAULT_DOWNLOAD_PREFERENCES: DownloadPreferences = {
   autoDownload: false,
   removeAfterDownload: false,
   saveInSubfolder: false,
-  subfolderName: ""
+  subfolderName: "",
+  conflictPolicy: "ask"
 };
-const WORKER_TIMEOUT_MS = 30000;
+const WORKER_TIMEOUT_MS = 120000;
 
 type SaveOutcome =
   | { status: "saved"; path?: string }
   | { status: "failed"; message: string }
-  | { status: "cancelled" };
+  | { status: "cancelled" }
+  | { status: "skipped" };
 
 function pluralizeImages(count: number) {
   return count === 1 ? "1 imagem" : `${count} imagens`;
@@ -97,11 +107,11 @@ function shouldUseNativeCompression(isDesktop: boolean, sourcePath?: string) {
 }
 
 function getWorkerTimeoutMs(file: File) {
-  // Imagens grandes e formatos lentos (AVIF) precisam de mais tempo que o piso de 30s.
+  // O peso máximo pode exigir várias codificações; fotos grandes ganham mais tempo.
   return WORKER_TIMEOUT_MS + Math.ceil(file.size / (1024 * 1024)) * 5000;
 }
 
-function compressInWorker(file: File, id: string, settings: CompressionSettings) {
+function compressInWorker(file: File, id: string, settings: CompressionSettings, signal?: AbortSignal) {
   return new Promise<WorkerResponse>((resolve, reject) => {
     const worker = new Worker(new URL("../workers/image-compression.worker.ts", import.meta.url), {
       type: "module"
@@ -125,8 +135,13 @@ function compressInWorker(file: File, id: string, settings: CompressionSettings)
       settled = true;
       window.clearTimeout(timeoutId);
       worker.terminate();
+      signal?.removeEventListener("abort", abort);
       return true;
     };
+
+    const abort = () => { if (finalize()) reject(new DOMException("Estimativa cancelada", "AbortError")); };
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) { abort(); return; }
 
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       if (!finalize()) {
@@ -159,13 +174,14 @@ function revokeImageUrls(image: QueueImage) {
 function getImageIdentity(file: File, sourcePath?: string) {
   return sourcePath
     ? `path:${sourcePath}`
-    : `file:${file.name}\u0000${file.size}\u0000${file.lastModified}\u0000${file.type}`;
+    : `file:${file.webkitRelativePath}\u0000${file.name}\u0000${file.size}\u0000${file.lastModified}\u0000${file.type}`;
 }
 
 async function compressImage(
   image: QueueImage,
   settings: CompressionSettings,
-  isDesktop: boolean
+  isDesktop: boolean,
+  signal?: AbortSignal
 ) {
   if (shouldUseNativeCompression(isDesktop, image.sourcePath)) {
     return compressNativeImage({
@@ -175,7 +191,7 @@ async function compressImage(
     });
   }
 
-  const result = await compressInWorker(image.file, image.id, settings);
+  const result = await compressInWorker(image.file, image.id, settings, signal);
 
   if (result.error || !result.blob) {
     throw new Error(result.error ?? "Nao foi possivel compactar esta imagem no worker.");
@@ -188,7 +204,17 @@ function isAbortError(error: unknown) {
   return typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError";
 }
 
-export function ImageCompressorApp() {
+export function ImageCompressorApp({ layout = "classic" }: { layout?: "classic" | "beta" }) {
+  const { resolveConflict, dialog: conflictDialog } = useFileConflicts();
+  const [processingStartedAt, setProcessingStartedAt] = useState<number>();
+  const [statisticsLoaded, setStatisticsLoaded] = useState(false);
+  const [lifetimeStats, setLifetimeStats] = useState({ images: 0, savedBytes: 0 });
+  const [estimates, setEstimates] = useState<{ outputBytes: number; sampleCount: number; samples: Record<string, number> }>();
+  useEffect(() => {
+    try { const stored = JSON.parse(localStorage.getItem("compact-img-statistics") ?? "null"); if (stored && Number.isFinite(stored.images) && Number.isFinite(stored.savedBytes)) setLifetimeStats(stored); } catch { /* Invalid storage starts at zero. */ }
+    setStatisticsLoaded(true);
+  }, []);
+  useEffect(() => { if (statisticsLoaded) localStorage.setItem("compact-img-statistics", JSON.stringify(lifetimeStats)); }, [lifetimeStats, statisticsLoaded]);
   const [settings, setSettings] = useState<CompressionSettings>(DEFAULT_SETTINGS);
   const [images, setImages] = useState<QueueImage[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
@@ -220,6 +246,8 @@ export function ImageCompressorApp() {
   const dismissNotice = useCallback((id: string) => {
     setNotices((current) => current.filter((notice) => notice.id !== id));
   }, []);
+
+  const reportWindowError = useCallback((message: string) => pushNotice("error", message, "window-control"), [pushNotice]);
 
   const updateImages = useCallback((updater: (current: QueueImage[]) => QueueImage[]) => {
     startTransition(() => {
@@ -373,11 +401,13 @@ export function ImageCompressorApp() {
     batchSummaryRef.current = {
       totalCount: images.length,
       completedCount: 0,
+      keptCount: 0,
       errorCount: 0,
       reductionTotal: 0,
       reductionCount: 0
     };
     setIsCancelRequested(false);
+    setProcessingStartedAt(Date.now());
     setIsProcessing(true);
     startTransition(() => {
       setProcessedCount(0);
@@ -428,11 +458,21 @@ export function ImageCompressorApp() {
             error: error instanceof Error ? error.message : "Nao foi possivel compactar esta imagem."
           };
         }
+        const keepOriginal = !result.error && result.blob && settings.keepOriginalIfLarger !== false && result.blob.size >= image.file.size
+          && (settings.compressionMode !== "target-size" || image.file.size <= (settings.maxFileSizeKB ?? 300) * 1024);
+        if (!result.error && result.blob && !keepOriginal) {
+          const savings = Math.max(0, image.file.size - result.blob.size);
+          setLifetimeStats((current) => {
+            const next = { images: current.images + 1, savedBytes: current.savedBytes + savings };
+            return next;
+          });
+        }
         const compressedName = replaceExtension(image.file.name, settings.outputFormat);
         const batchSummary = batchSummaryRef.current;
         if (batchSummary) {
           if (result.error || !result.blob) {
             batchSummary.errorCount += 1;
+          } else if (keepOriginal) { batchSummary.keptCount = (batchSummary.keptCount ?? 0) + 1;
           } else {
             batchSummary.completedCount += 1;
             const reduction = getReduction(image.file.size, result.blob.size);
@@ -464,13 +504,13 @@ export function ImageCompressorApp() {
 
             return {
               ...item,
-              compressedBlob: result.blob,
-              compressedUrl: URL.createObjectURL(result.blob),
-              compressedName,
+              compressedBlob: keepOriginal ? undefined : result.blob,
+              compressedUrl: keepOriginal ? undefined : URL.createObjectURL(result.blob),
+              compressedName: keepOriginal ? undefined : compressedName,
               savedPath: undefined,
               originalDimensions: result.originalDimensions ?? item.originalDimensions,
-              finalDimensions: result.finalDimensions,
-              status: "done",
+              finalDimensions: keepOriginal ? item.originalDimensions : result.finalDimensions,
+              status: keepOriginal ? "kept" : "done",
               error: undefined,
               downloadError: undefined
             };
@@ -493,6 +533,7 @@ export function ImageCompressorApp() {
         setLastQueueSummary({
           totalCount: batchSummary.totalCount,
           completedCount: batchSummary.completedCount,
+          keptCount: batchSummary.keptCount,
           errorCount: batchSummary.errorCount,
           averageReduction: batchSummary.reductionCount
             ? batchSummary.reductionTotal / batchSummary.reductionCount
@@ -502,7 +543,7 @@ export function ImageCompressorApp() {
       if (cancelRequestedRef.current && batchSummary) {
         pushNotice(
           "info",
-          `Compactação cancelada. ${batchSummary.completedCount} de ${batchSummary.totalCount} imagens foram concluídas.`
+          `Compactação cancelada. ${batchSummary.completedCount + (batchSummary.keptCount ?? 0)} de ${batchSummary.totalCount} imagens foram concluídas.`
         );
       } else if (batchSummary?.errorCount) {
         pushNotice(
@@ -535,7 +576,7 @@ export function ImageCompressorApp() {
     }
 
     try {
-      let savedPath: string | undefined;
+      let savedPath: string | null | undefined;
 
       if (!isDesktop) {
         await downloadBlob(image.compressedBlob, image.compressedName, {
@@ -562,8 +603,14 @@ export function ImageCompressorApp() {
           blob: image.compressedBlob,
           fileName: image.compressedName,
           sourcePath: image.sourcePath,
-          destinationPath: destinationPath ?? undefined
+          destinationPath: destinationPath ?? undefined,
+          conflictPolicy: downloadPreferences.conflictPolicy, resolveConflict
         });
+        if (!savedPath) {
+          updateImages((current) => current.map((item) => item.id === id ? { ...item, status: "skipped", downloadError: undefined } : item));
+          if (!options?.silent) pushNotice("info", `${image.compressedName} ignorada: já existe no destino.`);
+          return { status: "skipped" };
+        }
       }
 
       if (downloadPreferences.removeAfterDownload && !options?.deferRemoval) {
@@ -582,7 +629,7 @@ export function ImageCompressorApp() {
             : `Download de ${image.compressedName} iniciado.`
         );
       }
-      return { status: "saved", path: savedPath };
+      return { status: "saved", path: savedPath ?? undefined };
     } catch (error) {
       if (isAbortError(error)) {
         return { status: "cancelled" };
@@ -600,7 +647,7 @@ export function ImageCompressorApp() {
       }
       return { status: "failed", message };
     }
-  }, [downloadPreferences, isDesktop, pushNotice, removeDownloadedImages, updateImages]);
+  }, [downloadPreferences, isDesktop, pushNotice, removeDownloadedImages, updateImages, resolveConflict]);
 
   const downloadImage = useCallback(async (id: string) => {
     await saveImage(id);
@@ -617,6 +664,8 @@ export function ImageCompressorApp() {
     try {
       const options = {
         chooseLocation: downloadPreferences.mode === "choose-location",
+        conflictPolicy: downloadPreferences.conflictPolicy, resolveConflict,
+        onSkipped: (id: string) => updateImages((current) => current.map((image) => image.id === id ? { ...image, status: "skipped", downloadError: undefined } : image)),
         subfolderName: downloadPreferences.saveInSubfolder
           ? normalizeSubfolderName(downloadPreferences.subfolderName)
           : undefined
@@ -649,7 +698,7 @@ export function ImageCompressorApp() {
       ));
       pushNotice("error", message);
     }
-  }, [downloadPreferences, pushNotice, removeDownloadedImages, updateImages]);
+  }, [downloadPreferences, pushNotice, removeDownloadedImages, updateImages, resolveConflict]);
 
   const downloadAllDesktop = useCallback(async () => {
     const readyImages = imagesRef.current.filter(
@@ -704,8 +753,10 @@ export function ImageCompressorApp() {
           blob: image.compressedBlob,
           fileName: image.compressedName,
           sourcePath: image.sourcePath,
-          destinationPath
+          destinationPath,
+          conflictPolicy: downloadPreferences.conflictPolicy, resolveConflict
         });
+        if (!savedPath) { updateImages((current) => current.map((item) => item.id === image.id ? { ...item, status: "skipped", downloadError: undefined } : item)); continue; }
         savedCount += 1;
         lastDirectory = getParentDirectory(savedPath);
 
@@ -717,6 +768,7 @@ export function ImageCompressorApp() {
           ));
         }
       } catch (error) {
+        if (isAbortError(error)) break;
         failedCount += 1;
         const message = error instanceof Error ? error.message : typeof error === "string" ? error : "Não foi possível baixar a imagem compactada.";
         updateImages((current) =>
@@ -736,7 +788,7 @@ export function ImageCompressorApp() {
         `${pluralizeImages(savedCount)} ${savedCount === 1 ? "salva" : "salvas"}${batchDirectory || savedCount === 1 ? ` em ${batchDirectory ?? lastDirectory}` : ""}.`
       );
     }
-  }, [downloadPreferences, pushNotice, removeDownloadedImages, updateImages]);
+  }, [downloadPreferences, pushNotice, removeDownloadedImages, updateImages, resolveConflict]);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -761,7 +813,7 @@ export function ImageCompressorApp() {
       autoDownloadInFlightRef.current.add(image.id);
       void saveImage(image.id, { deferRemoval: true, silent: true }).then((outcome) => {
         const result = autoDownloadResultRef.current;
-        if (outcome.status === "cancelled") {
+        if (outcome.status === "cancelled" || outcome.status === "skipped") {
           return;
         }
         if (outcome.status === "saved") {
@@ -875,11 +927,51 @@ export function ImageCompressorApp() {
     };
   }, []);
 
+  useEffect(() => {
+    const paste = (event: ClipboardEvent) => {
+      if (isProcessing || (event.target instanceof HTMLElement && event.target.closest("input, textarea, [contenteditable=true]"))) return;
+      const files = Array.from(event.clipboardData?.files ?? []).filter(isAcceptedImage);
+      if (files.length) { event.preventDefault(); addFiles(files.map((file) => ({ file }))); }
+    };
+    window.addEventListener("paste", paste);
+    return () => window.removeEventListener("paste", paste);
+  }, [addFiles, isProcessing]);
+
+  const pendingEstimateKey = images.filter((image) => image.status === "pending").map((image) => image.id).join(",");
+  useEffect(() => {
+    setEstimates(undefined);
+    if (layout !== "beta" || isProcessing || !pendingEstimateKey) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      const pending = imagesRef.current.filter((image) => image.status === "pending");
+      const sample = pending.slice(0, 3);
+      const samples: Record<string, number> = {};
+      let sampledOriginal = 0;
+      let sampledOutput = 0;
+      for (const image of sample) {
+        if (controller.signal.aborted) return;
+        try {
+          const result = await compressImage(image, settings, isDesktop, controller.signal);
+          if (!result.blob) continue;
+          const canKeep = settings.keepOriginalIfLarger !== false && (settings.compressionMode !== "target-size" || image.file.size <= (settings.maxFileSizeKB ?? 300) * 1024);
+          const output = canKeep ? Math.min(image.file.size, result.blob.size) : result.blob.size;
+          samples[image.id] = result.blob.size;
+          sampledOriginal += image.file.size;
+          sampledOutput += output;
+        } catch { /* The processing action reports encoding errors; never invent an estimate. */ }
+      }
+      if (!controller.signal.aborted && sampledOriginal > 0) setEstimates({ outputBytes: pending.reduce((total, image) => total + image.file.size, 0) * sampledOutput / sampledOriginal, sampleCount: Object.keys(samples).length, samples });
+    }, 650);
+    return () => { window.clearTimeout(timeout); controller.abort(); };
+  }, [pendingEstimateKey, settings, isDesktop, isProcessing, layout]);
+
+  const Workspace = layout === "beta" ? PremiumImageWorkspace : ClassicImageWorkspace;
+
   return (
-    <main className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-foreground/10 bg-background/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-3 py-2.5 sm:px-5 xl:px-8">
-          <div className="flex items-center gap-3">
+    <div data-image-compressor-app className="min-h-screen">
+      {layout === "beta" ? <WindowTitlebar isDesktop={isDesktop} onError={reportWindowError} /> : <header className="sticky top-0 z-30 border-b border-foreground/10 bg-background/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-3 py-2.5 sm:gap-4 sm:px-5 xl:px-8">
+          <div className="flex items-center gap-2 sm:gap-3">
             <img
               src="/icon.svg"
               alt=""
@@ -887,12 +979,12 @@ export function ImageCompressorApp() {
               height={34}
               className="h-[34px] w-[34px] rounded-md transition-transform duration-300 hover:rotate-[-4deg] hover:scale-105"
             />
-            <h1 className="text-base font-bold tracking-tight">Compact Img</h1>
+            <h1 className="whitespace-nowrap text-sm font-bold tracking-tight sm:text-base">Compact Img</h1>
           </div>
-          <span className="hidden rounded-sm border border-foreground/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:inline-flex">Beta</span>
+          <LayoutSwitcher layout={layout} />
         </div>
-      </header>
-      <BetaImageWorkspace
+      </header>}
+      <Workspace
           settings={settings}
           onSettingsChange={handleSettingsChange}
           downloadPreferences={downloadPreferences}
@@ -905,6 +997,9 @@ export function ImageCompressorApp() {
           isDesktop={isDesktop}
           processedCount={processedCount}
           progress={progress}
+          processingStartedAt={processingStartedAt}
+          estimates={estimates}
+          lifetimeStats={lifetimeStats}
           invalidFiles={invalidFiles}
           onInvalidFiles={setInvalidFiles}
           onFiles={addFiles}
@@ -918,7 +1013,8 @@ export function ImageCompressorApp() {
           onDownloadAllDesktop={downloadAllDesktop}
           onDownloadAllWeb={downloadAllWeb}
       />
+      {conflictDialog}
       <NoticeToaster notices={notices} onDismiss={dismissNotice} />
-    </main>
+    </div>
   );
 }

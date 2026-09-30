@@ -1,10 +1,11 @@
 import type { OutputFormat } from "@/lib/utils";
 
-export type ImageStatus = "pending" | "processing" | "done" | "error";
+export type ImageStatus = "pending" | "processing" | "done" | "error" | "kept" | "skipped";
 export type JpegCompressionMode = "fast" | "balanced" | "max";
 
 export type CompressionSettings = {
   preserveOriginalDimensions: boolean;
+  sizePreset?: "hd" | "4k" | "custom";
   maxWidth: number;
   maxHeight: number;
   quality: number;
@@ -12,6 +13,10 @@ export type CompressionSettings = {
   jpegCompressionMode: JpegCompressionMode;
   keepAspectRatio: boolean;
   stripMetadata: boolean;
+  compressionMode?: "quality" | "target-size";
+  maxFileSizeKB?: number;
+  jpegBackgroundColor?: string;
+  keepOriginalIfLarger?: boolean;
 };
 
 export type ImageDimensions = {
@@ -21,7 +26,10 @@ export type ImageDimensions = {
 
 export type DownloadMode = "same-folder" | "choose-location";
 
+export type ConflictPolicy = "ask" | "rename" | "overwrite" | "skip";
+
 export type DownloadPreferences = {
+  conflictPolicy?: ConflictPolicy;
   mode: DownloadMode;
   autoDownload: boolean;
   removeAfterDownload: boolean;
@@ -32,6 +40,7 @@ export type DownloadPreferences = {
 export type QueueSummary = {
   totalCount: number;
   completedCount: number;
+  keptCount?: number;
   errorCount: number;
   averageReduction?: number;
 };

@@ -38,7 +38,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 
-type BetaImageWorkspaceProps = {
+export type ImageWorkspaceProps = {
   settings: CompressionSettings;
   onSettingsChange: (settings: CompressionSettings) => void;
   downloadPreferences: DownloadPreferences;
@@ -51,6 +51,9 @@ type BetaImageWorkspaceProps = {
   isDesktop: boolean;
   processedCount: number;
   progress: number;
+  processingStartedAt?: number;
+  lifetimeStats?: { images: number; savedBytes: number };
+  estimates?: { outputBytes: number; sampleCount: number; samples: Record<string, number> };
   invalidFiles: string[];
   onInvalidFiles: (names: string[]) => void;
   onFiles: (files: SelectedImage[]) => void;
@@ -74,9 +77,9 @@ const FORMAT_OPTIONS: { value: OutputFormat; label: string }[] = [
 
 const SIZE_PRESET_OPTIONS = [
   { value: "original", label: "Original" },
-  { value: "web", label: "Web" },
   { value: "hd", label: "Full HD" },
-  { value: "4k", label: "4K" }
+  { value: "4k", label: "4K" },
+  { value: "custom", label: "Personalizado" }
 ] as const;
 
 const JPEG_MODE_OPTIONS = [
@@ -119,14 +122,15 @@ function SettingField({
   );
 }
 
-function OutputSettings({
+export function OutputSettings({
   settings,
   onSettingsChange,
   downloadPreferences,
   onDownloadPreferencesChange,
   disabled,
   isDesktop,
-  actions
+  actions,
+  presentation = "panel"
 }: {
   settings: CompressionSettings;
   onSettingsChange: (settings: CompressionSettings) => void;
@@ -134,7 +138,8 @@ function OutputSettings({
   onDownloadPreferencesChange: (preferences: DownloadPreferences) => void;
   disabled: boolean;
   isDesktop: boolean;
-  actions: ReactNode;
+  actions?: ReactNode;
+  presentation?: "panel" | "sheet";
 }) {
   const update = <K extends keyof CompressionSettings>(key: K, value: CompressionSettings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
@@ -146,38 +151,40 @@ function OutputSettings({
 
   const activeSizePreset = settings.preserveOriginalDimensions
     ? "original"
-    : !settings.keepAspectRatio
-      ? "custom"
-      : settings.maxWidth === 1920 && settings.maxHeight === 1080
+    : settings.sizePreset ?? (settings.maxWidth === 1920 && settings.maxHeight === 1080
       ? "hd"
       : settings.maxWidth === 3840 && settings.maxHeight === 2160
         ? "4k"
-        : settings.maxWidth === 2000 && settings.maxHeight === 2000
-          ? "web"
-          : "custom";
+        : "custom");
 
-  const setSizePreset = (preset: "original" | "web" | "hd" | "4k") => {
+  const setSizePreset = (preset: "original" | "custom" | "hd" | "4k") => {
     if (preset === "original") {
       onSettingsChange({ ...settings, preserveOriginalDimensions: true });
       return;
     }
-    const dimensions = preset === "web"
-      ? { maxWidth: 2000, maxHeight: 2000 }
-      : preset === "hd"
+    if (preset === "custom") {
+      onSettingsChange({ ...settings, sizePreset: "custom", preserveOriginalDimensions: false });
+      return;
+    }
+    const dimensions = preset === "hd"
         ? { maxWidth: 1920, maxHeight: 1080 }
         : { maxWidth: 3840, maxHeight: 2160 };
     onSettingsChange({
       ...settings,
       ...dimensions,
+      sizePreset: preset,
       keepAspectRatio: true,
       preserveOriginalDimensions: false
     });
   };
+  const updateDimension = (key: "maxWidth" | "maxHeight", value: string) => {
+    onSettingsChange({ ...settings, [key]: Math.max(1, Math.min(10000, Number(value) || 1)), sizePreset: "custom", preserveOriginalDimensions: false });
+  };
 
   return (
-    <section className="inspector-panel flex flex-col overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center gap-3 border-b border-border/70 px-5 py-4">
-        <div className="beta-icon-tile flex h-9 w-9 items-center justify-center rounded-md">
+    <section className={cn("flex flex-col overflow-hidden bg-card", presentation === "panel" && "inspector-panel rounded-xl border border-border")}>
+      <div className={cn("flex items-center gap-3 border-b border-border/70 px-5 py-4", presentation === "sheet" && "hidden")}>
+        <div className="classic-icon-tile flex h-9 w-9 items-center justify-center rounded-md">
           <Settings2 className="h-4 w-4" />
         </div>
         <div className="min-w-0">
@@ -187,21 +194,33 @@ function OutputSettings({
       </div>
 
       <div className="order-2 grid gap-5 px-5 py-5 lg:order-1">
-        <fieldset className="m-0 min-w-0 border-0 p-0" aria-labelledby="beta-format-label" disabled={disabled}>
-          <SettingField label="Formato" labelId="beta-format-label">
+        <fieldset className="m-0 min-w-0 border-0 p-0" aria-labelledby="classic-format-label" disabled={disabled}>
+          <SettingField label="Formato" labelId="classic-format-label">
             <SegmentedControl
               options={FORMAT_OPTIONS}
               value={settings.outputFormat}
               onChange={(value) => update("outputFormat", value)}
               disabled={disabled}
-              ariaLabelledBy="beta-format-label"
+              ariaLabelledBy="classic-format-label"
             />
           </SettingField>
         </fieldset>
 
+        <SettingField label="Compressão" labelId="compression-mode-label">
+          <SegmentedControl ariaLabelledBy="compression-mode-label" disabled={disabled} value={settings.compressionMode ?? "quality"}
+            options={[{ value: "quality", label: "Qualidade" }, { value: "target-size", label: "Peso máximo" }]}
+            onChange={(value) => update("compressionMode", value)} />
+        </SettingField>
+        {settings.compressionMode === "target-size" ? <SettingField label="Peso máximo por imagem (KB)" htmlFor="max-file-size">
+          <Input id="max-file-size" type="number" min={1} max={102400} value={settings.maxFileSizeKB ?? 300} disabled={disabled}
+            onChange={(event) => update("maxFileSizeKB", Math.min(102400, Math.max(1, Number(event.target.value) || 1)))} />
+          <div className="mt-2 flex flex-wrap gap-2">{[100, 200, 300, 500, 1000].map((size) => <button key={size} type="button" disabled={disabled}
+            aria-pressed={settings.maxFileSizeKB === size} onClick={() => update("maxFileSizeKB", size)} className="rounded-md border border-input px-2 py-1 text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">{size} KB</button>)}</div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Ajusta a qualidade para respeitar o limite. Se necessário, reduz as dimensões; com tamanho Original, avisa se o limite não puder ser atingido.{settings.outputFormat === "png" ? " PNG mantém a qualidade e reduz somente as dimensões." : ""}</p>
+        </SettingField> : <>
         <SettingField
           label="Qualidade"
-          htmlFor="beta-quality"
+          htmlFor="classic-quality"
           trailing={(
             <span className="text-sm font-semibold tabular-nums text-foreground">
               {settings.outputFormat === "png" ? "Sem perdas" : `${settings.quality}%`}
@@ -209,7 +228,7 @@ function OutputSettings({
           )}
         >
           <Slider
-            id="beta-quality"
+            id="classic-quality"
             min={1}
             max={100}
             step={1}
@@ -220,10 +239,11 @@ function OutputSettings({
             className="py-1"
           />
         </SettingField>
+        </>}
 
         <SettingField
           label="Tamanho máximo"
-          labelId="beta-size-label"
+          labelId="classic-size-label"
           trailing={<Maximize2 className="h-3.5 w-3.5 text-muted-foreground/70" />}
           className="border-t border-border/70 pt-4"
         >
@@ -232,20 +252,20 @@ function OutputSettings({
             value={activeSizePreset}
             onChange={setSizePreset}
             disabled={disabled}
-            ariaLabelledBy="beta-size-label"
+            ariaLabelledBy="classic-size-label"
           />
           {!settings.preserveOriginalDimensions ? (
             <div className="mt-2 grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-end gap-1.5">
-              <SettingField label="Largura" htmlFor="beta-width">
+              <SettingField label="Largura" htmlFor="classic-width">
                 <div className="relative">
                   <Input
-                    id="beta-width"
+                    id="classic-width"
                     type="number"
                     min={1}
                     max={10000}
                     value={settings.maxWidth}
                     disabled={disabled}
-                    onChange={(event) => update("maxWidth", Math.max(1, Number(event.target.value) || 1))}
+                    onChange={(event) => updateDimension("maxWidth", event.target.value)}
                     className="h-9 pr-9 text-sm tabular-nums"
                   />
                   <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/70">px</span>
@@ -269,16 +289,16 @@ function OutputSettings({
                   ? <LockKeyhole className="h-4 w-4" />
                   : <LockKeyholeOpen className="h-4 w-4" />}
               </button>
-              <SettingField label="Altura" htmlFor="beta-height">
+              <SettingField label="Altura" htmlFor="classic-height">
                 <div className="relative">
                   <Input
-                    id="beta-height"
+                    id="classic-height"
                     type="number"
                     min={1}
                     max={10000}
                     value={settings.maxHeight}
                     disabled={disabled}
-                    onChange={(event) => update("maxHeight", Math.max(1, Number(event.target.value) || 1))}
+                    onChange={(event) => updateDimension("maxHeight", event.target.value)}
                     className="h-9 pr-9 text-sm tabular-nums"
                   />
                   <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/70">px</span>
@@ -291,28 +311,42 @@ function OutputSettings({
         </SettingField>
 
         {settings.outputFormat === "jpeg" && isDesktop ? (
-          <SettingField label="Modo JPG" labelId="beta-jpeg-mode-label" className="border-t border-border/70 pt-4">
+          <SettingField label="Modo JPG" labelId="classic-jpeg-mode-label" className="border-t border-border/70 pt-4">
             <SegmentedControl
               options={JPEG_MODE_OPTIONS}
               value={settings.jpegCompressionMode}
               onChange={(value) => update("jpegCompressionMode", value)}
               disabled={disabled}
-              ariaLabelledBy="beta-jpeg-mode-label"
+              ariaLabelledBy="classic-jpeg-mode-label"
             />
           </SettingField>
         ) : null}
 
-        <details className="group border-t border-border/70 pt-4">
+        <details open={presentation === "sheet" ? true : undefined} className="group border-t border-border/70 pt-4">
           <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg text-xs font-semibold text-foreground/80 transition-colors hover:text-brand-strong [&::-webkit-details-marker]:hidden">
             Mais opções
             <ChevronDown className="h-4 w-4 text-muted-foreground/70 transition-transform group-open:rotate-180" />
           </summary>
           <div className="grid gap-2.5 pt-4">
+            <SettingField label="Se o arquivo já existir" htmlFor="file-conflict-policy">
+              <select id="file-conflict-policy" value={downloadPreferences.conflictPolicy ?? "ask"} disabled={disabled}
+                onChange={(event) => updateDownload("conflictPolicy", event.target.value as DownloadPreferences["conflictPolicy"])}
+                className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+                <option value="ask">Perguntar</option><option value="rename">Manter os dois</option><option value="overwrite">Substituir</option><option value="skip">Pular</option>
+              </select>
+              {!isDesktop ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Estas regras se aplicam ao baixar arquivos individuais em uma pasta escolhida. No download comum e no ZIP, o navegador gerencia arquivos existentes.</p> : null}
+            </SettingField>
+            <PreferenceToggle id="keep-original" label="Manter original se a saída ficar maior" checked={settings.keepOriginalIfLarger !== false} disabled={disabled} onCheckedChange={(checked) => update("keepOriginalIfLarger", checked)} />
+            {settings.outputFormat === "jpeg" ? <SettingField label="Fundo para transparência" htmlFor="jpeg-background">
+              <div className="flex items-center gap-3"><input id="jpeg-background" type="color" value={settings.jpegBackgroundColor ?? "#ffffff"} disabled={disabled} onChange={(event) => update("jpegBackgroundColor", event.target.value)} className="h-10 w-12 rounded border border-input bg-card" /><span className="text-sm">{settings.jpegBackgroundColor ?? "#ffffff"}</span></div>
+              <p className="mt-2 text-xs text-muted-foreground">JPG não mantém transparência. As áreas transparentes recebem esta cor.</p>
+            </SettingField> : null}
+
             <div role="group" aria-label="Local de salvamento" className="grid gap-2.5 rounded-md bg-muted/50 px-3 py-2.5">
-              <SettingField label="Destino do download" htmlFor="beta-download-mode">
+              <SettingField label="Destino do download" htmlFor="classic-download-mode">
                 <div className="relative">
                   <select
-                    id="beta-download-mode"
+                    id="classic-download-mode"
                     value={downloadPreferences.mode}
                     disabled={disabled}
                     onChange={(event) => updateDownload("mode", event.target.value as DownloadPreferences["mode"])}
@@ -327,11 +361,11 @@ function OutputSettings({
               {downloadPreferences.mode === "same-folder" ? (
                 <div className="grid gap-2 border-t border-border/70 pt-2.5">
                   <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="beta-subfolder" className="text-[13px] font-medium leading-snug text-foreground/80">
+                    <Label htmlFor="classic-subfolder" className="text-[13px] font-medium leading-snug text-foreground/80">
                       Salvar em subpasta
                     </Label>
                     <Switch
-                      id="beta-subfolder"
+                      id="classic-subfolder"
                       checked={downloadPreferences.saveInSubfolder}
                       disabled={disabled}
                       onCheckedChange={(checked) => updateDownload("saveInSubfolder", checked)}
@@ -339,7 +373,7 @@ function OutputSettings({
                   </div>
                   {downloadPreferences.saveInSubfolder ? (
                     <Input
-                      id="beta-subfolder-name"
+                      id="classic-subfolder-name"
                       value={downloadPreferences.subfolderName}
                       placeholder="imagens-compactadas"
                       disabled={disabled}
@@ -353,7 +387,7 @@ function OutputSettings({
             </div>
             {isDesktop && settings.outputFormat === "jpeg" ? (
               <PreferenceToggle
-                id="beta-metadata"
+                id="classic-metadata"
                 label="Remover metadados"
                 checked={settings.stripMetadata}
                 disabled={disabled}
@@ -363,14 +397,14 @@ function OutputSettings({
             {downloadPreferences.mode === "same-folder" ? (
               <>
                 <PreferenceToggle
-                  id="beta-auto-download"
+                  id="classic-auto-download"
                   label={isDesktop ? "Baixar ao concluir" : "Baixar ZIP ao concluir"}
                   checked={downloadPreferences.autoDownload}
                   disabled={disabled}
                   onCheckedChange={(checked) => updateDownload("autoDownload", checked)}
                 />
                 <PreferenceToggle
-                  id="beta-remove-downloaded"
+                  id="classic-remove-downloaded"
                   label="Remover da fila após baixar"
                   checked={downloadPreferences.removeAfterDownload}
                   disabled={disabled}
@@ -381,9 +415,9 @@ function OutputSettings({
           </div>
         </details>
       </div>
-      <div className="order-1 border-b border-border/70 bg-background/45 px-5 py-4 lg:order-2 lg:border-b-0 lg:border-t">
+      {actions ? <div className="order-1 border-b border-border/70 bg-background/45 px-5 py-4 lg:order-2 lg:border-b-0 lg:border-t">
         {actions}
-      </div>
+      </div> : null}
     </section>
   );
 }
@@ -413,6 +447,8 @@ function StatusPill({ status }: { status: QueueImage["status"] }) {
   const config = {
     pending: { label: "Na fila", icon: Clock3, className: "bg-muted text-muted-foreground" },
     processing: { label: "Compactando", icon: LoaderCircle, className: "bg-brand-soft text-brand-strong" },
+    kept: { label: "Original mantido", icon: CheckCircle2, className: "bg-muted text-muted-foreground" },
+    skipped: { label: "Ignorada", icon: X, className: "bg-muted text-muted-foreground" },
     done: { label: "Pronta", icon: CheckCircle2, className: "bg-success-soft text-success" },
     error: { label: "Erro", icon: X, className: "bg-destructive/10 text-destructive" }
   }[status];
@@ -431,7 +467,7 @@ function ImagePreview({ image, onClose }: { image: QueueImage; onClose: () => vo
   const displayedMode = hasCompressed ? mode : "original";
 
   return (
-    <section className="beta-card overflow-hidden rounded-xl border border-border bg-card">
+    <section className="classic-card overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-background text-foreground/70">
@@ -513,14 +549,14 @@ function QueuePanel({
   onFiles,
   onInvalidFiles,
   onClear
-}: Pick<BetaImageWorkspaceProps,
+}: Pick<ImageWorkspaceProps,
   "images" | "selectedImage" | "isProcessing" | "isDesktop" | "processedCount" | "progress" | "onSelect" | "onRemove" | "onDownload" | "onFiles" | "onInvalidFiles" | "onClear"
 > & { selectedId?: string }) {
   const readyCount = images.filter((image) => image.status === "done").length;
   const errorCount = images.filter((image) => image.status === "error").length;
 
   return (
-    <section className="beta-card overflow-hidden rounded-lg border border-border bg-card">
+    <section className="classic-card overflow-hidden rounded-lg border border-border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3.5 sm:px-5">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-foreground">Fila de imagens</h2>
@@ -601,11 +637,11 @@ function CompletedBatch({ summary, onFiles, onInvalidFiles, onClear, isDesktop }
   isDesktop: boolean;
 }) {
   return (
-    <section className="beta-card animate-enter flex min-h-[240px] flex-col justify-between rounded-lg border border-success/30 bg-card p-5 sm:p-7">
+    <section className="classic-card animate-enter flex min-h-[240px] flex-col justify-between rounded-lg border border-success/30 bg-card p-5 sm:p-7">
       <div>
         <span className="flex h-10 w-10 items-center justify-center rounded-md bg-success-soft text-success"><Check className="h-5 w-5" /></span>
         <h2 className="mt-4 text-lg font-semibold text-foreground">Lote concluído</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{summary.completedCount} de {summary.totalCount} imagens prontas{summary.errorCount ? ` · ${summary.errorCount} com erro` : ""}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{summary.completedCount} de {summary.totalCount} imagens prontas{summary.keptCount ? ` · ${summary.keptCount} originais mantidos` : ""}{summary.errorCount ? ` · ${summary.errorCount} com erro` : ""}</p>
       </div>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -621,7 +657,7 @@ function CompletedBatch({ summary, onFiles, onInvalidFiles, onClear, isDesktop }
   );
 }
 
-export function BetaImageWorkspace(props: BetaImageWorkspaceProps) {
+export function ClassicImageWorkspace(props: ImageWorkspaceProps) {
   const {
     settings,
     onSettingsChange,
@@ -648,9 +684,9 @@ export function BetaImageWorkspace(props: BetaImageWorkspaceProps) {
     onDownloadAllDesktop,
     onDownloadAllWeb
   } = props;
-  const isComplete = useMemo(() => images.length > 0 && images.every((image) => image.status === "done" || image.status === "error"), [images]);
+  const isComplete = useMemo(() => images.length > 0 && images.every((image) => image.status !== "pending" && image.status !== "processing"), [images]);
   const hasCompressed = images.some((image) => image.status === "done" && image.compressedBlob);
-  const hasProcessed = images.some((image) => image.status === "done" || image.status === "error");
+  const hasProcessed = images.some((image) => image.status !== "pending" && image.status !== "processing");
   const readyCount = images.filter((image) => image.status === "done" && image.compressedBlob).length;
 
   return (
@@ -721,16 +757,16 @@ export function BetaImageWorkspace(props: BetaImageWorkspaceProps) {
                     </Button>
                   ) : isComplete && hasCompressed ? (
                     isDesktop ? (
-                      <Button type="button" className="beta-primary-action h-11 w-full" onClick={() => void onDownloadAllDesktop()}>
+                      <Button type="button" className="classic-primary-action h-11 w-full" onClick={() => void onDownloadAllDesktop()}>
                         <ArrowDownToLine className="h-4 w-4" />Baixar {readyCount} {readyCount === 1 ? "imagem" : "imagens"}
                       </Button>
                     ) : (
-                      <Button type="button" className="beta-primary-action h-11 w-full" onClick={() => void onDownloadAllWeb("zip")}>
+                      <Button type="button" className="classic-primary-action h-11 w-full" onClick={() => void onDownloadAllWeb("zip")}>
                         <ArrowDownToLine className="h-4 w-4" />Baixar ZIP
                       </Button>
                     )
                   ) : (
-                    <Button type="button" className="beta-primary-action h-11 w-full" disabled={!images.length} onClick={onProcess}>
+                    <Button type="button" className="classic-primary-action h-11 w-full" disabled={!images.length} onClick={onProcess}>
                       {hasProcessed ? <RefreshCw className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
                       {hasProcessed ? "Recompactar lote" : `Compactar ${images.length || "imagens"}`}
                     </Button>
