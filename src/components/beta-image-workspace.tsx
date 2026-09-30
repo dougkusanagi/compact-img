@@ -308,15 +308,6 @@ function OutputSettings({
             <ChevronDown className="h-4 w-4 text-muted-foreground/70 transition-transform group-open:rotate-180" />
           </summary>
           <div className="grid gap-2.5 pt-4">
-            {isDesktop && settings.outputFormat === "jpeg" ? (
-              <PreferenceToggle
-                id="beta-metadata"
-                label="Remover metadados"
-                checked={settings.stripMetadata}
-                disabled={disabled}
-                onCheckedChange={(checked) => update("stripMetadata", checked)}
-              />
-            ) : null}
             <div role="group" aria-label="Local de salvamento" className="grid gap-2.5 rounded-md bg-muted/50 px-3 py-2.5">
               <SettingField label="Destino do download" htmlFor="beta-download-mode">
                 <div className="relative">
@@ -356,10 +347,19 @@ function OutputSettings({
                       aria-label="Nome da subpasta"
                       className="h-9 bg-card"
                     />
-                ) : null}
-              </div>
+                  ) : null}
+                </div>
               ) : null}
             </div>
+            {isDesktop && settings.outputFormat === "jpeg" ? (
+              <PreferenceToggle
+                id="beta-metadata"
+                label="Remover metadados"
+                checked={settings.stripMetadata}
+                disabled={disabled}
+                onCheckedChange={(checked) => update("stripMetadata", checked)}
+              />
+            ) : null}
             {downloadPreferences.mode === "same-folder" ? (
               <>
                 <PreferenceToggle
