@@ -27,9 +27,6 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "msi"
-    ],
     "category": "GraphicsAndDesign",
     "shortDescription": "Compactacao local de imagens em lote.",
     "longDescription": "Compacta imagens em lote localmente, sem enviar arquivos para servidores.",

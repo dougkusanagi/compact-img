@@ -5,17 +5,18 @@
   "author": "Douglas Kusanagi",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/ensure-dev-port.mjs && next dev --port 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "test": "bun test",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build --bundles msi",
+    "desktop:build": "tauri build",
     "desktop:dist": "pwsh -NoProfile -File scripts/build-windows-release.ps1"
   },
   "dependencies": {
+    "@fontsource-variable/ibm-plex-sans": "^5.3.0",
     "@radix-ui/react-dialog": "^1.1.7",
     "@radix-ui/react-progress": "^1.1.2",
     "@radix-ui/react-select": "^2.1.7",

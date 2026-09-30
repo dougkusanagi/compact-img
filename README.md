@@ -43,8 +43,12 @@ bun run desktop:dev
 bun run desktop:build
 ```
 
-O build Windows gera somente o MSI do Tauri em
-`src-tauri/target/release/bundle/msi/`.
+O alvo do instalador acompanha o sistema operacional: no Windows, o build gera
+o MSI em `src-tauri/target/release/bundle/msi/`; no Linux, gera o AppImage em
+`src-tauri/target/release/bundle/appimage/`.
+
+O Tauri nao gera MSI nativamente no Linux. Para uma release Windows, execute o
+mesmo comando em uma maquina Windows ou no ambiente Windows da CI.
 
 Para gerar uma release e verificar assinatura, Microsoft Defender e SHA-256:
 

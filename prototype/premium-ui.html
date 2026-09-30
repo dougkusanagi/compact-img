@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="pt-BR" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GuepardoSys Compact — protótipo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23F2B233'/%3E%3Cpath d='M22.4 9.6A9 9 0 1 0 25 16' fill='none' stroke='%23171109' stroke-width='3.6' stroke-linecap='round'/%3E%3Ccircle cx='19.9' cy='16' r='2.1' fill='%23171109'/%3E%3Ccircle cx='15.5' cy='16' r='1.45' fill='%23171109'/%3E%3Ccircle cx='12.2' cy='16' r='.9' fill='%23171109'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Instrument Sans', 'system-ui', 'sans-serif'], display: ['Bricolage Grotesque', 'Instrument Sans', 'sans-serif'], mono: ['IBM Plex Mono', 'ui-monospace', 'monospace'] },
+        fontWeight: { 450: '450', 500: '500', 550: '550', 600: '600', 650: '650', 700: '700' },
+        colors: {
+          bg: 'rgb(var(--bg) / <alpha-value>)',
+          panel: 'rgb(var(--panel) / <alpha-value>)',
+          elev: 'rgb(var(--elev) / <alpha-value>)',
+          line: 'rgb(var(--line) / <alpha-value>)',
+          ink: 'rgb(var(--ink) / <alpha-value>)',
+          mute: 'rgb(var(--mute) / <alpha-value>)',
+          dim: 'rgb(var(--dim) / <alpha-value>)',
+          accent: 'rgb(var(--accent) / <alpha-value>)',
+          onaccent: 'rgb(var(--on-accent) / <alpha-value>)',
+          ok: 'rgb(var(--ok) / <alpha-value>)',
+          warn: 'rgb(var(--warn) / <alpha-value>)',
+          bad: 'rgb(var(--bad) / <alpha-value>)'
+        },
+        boxShadow: {
+          pop: '0 18px 48px -16px rgb(0 0 0 / .6), 0 0 0 1px rgb(var(--line) / .08)'
+        }
+      }
+    }
+  }
+</script>
+<style>
+  :root {
+    --bg: 13 12 11; --panel: 19 18 16; --elev: 28 26 23; --line: 255 250 240;
+    --ink: 236 232 224; --mute: 163 156 145; --dim: 112 106 97;
+    --accent: 242 178 51; --on-accent: 23 17 9; --ok: 120 205 140; --warn: 245 128 62; --bad: 240 88 84;
+    --side: 236px; --insp: 320px;
+    --line-a: .075; --checker-a: #181715; --checker-b: #1e1c19;
+  }
+  .light {
+    --bg: 243 241 236; --panel: 250 248 244; --elev: 255 255 255; --line: 40 30 15;
+    --ink: 29 25 20; --mute: 104 97 87; --dim: 154 146 134;
+    --accent: 196 134 14; --on-accent: 255 252 245; --ok: 30 135 70; --warn: 206 94 22; --bad: 205 45 50;
+    --line-a: .1; --checker-a: #ebe8e2; --checker-b: #f4f2ee;
+  }
+  html, body { height: 100%; }
+  body { background: rgb(var(--bg)); color: rgb(var(--ink)); font-family: 'Instrument Sans', system-ui, sans-serif; font-feature-settings: 'tnum'; -webkit-font-smoothing: antialiased; user-select: none; overflow: hidden; }
+  .bd { border-color: rgb(var(--line) / var(--line-a)); }
+  .ring-line { box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-a)); }
+  .hair-t { border-top: 1px solid rgb(var(--line) / var(--line-a)); }
+  .hair-b { border-bottom: 1px solid rgb(var(--line) / var(--line-a)); }
+  .hair-l { border-left: 1px solid rgb(var(--line) / var(--line-a)); }
+  .hair-r { border-right: 1px solid rgb(var(--line) / var(--line-a)); }
+  .checker { background-color: var(--checker-a); background-image: linear-gradient(45deg, var(--checker-b) 25%, transparent 25%, transparent 75%, var(--checker-b) 75%), linear-gradient(45deg, var(--checker-b) 25%, transparent 25%, transparent 75%, var(--checker-b) 75%); background-size: 20px 20px; background-position: 0 0, 10px 10px; }
+  .ico { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .ico-sm { width: 14px; height: 14px; }
+  .ico-lg { width: 20px; height: 20px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: rgb(var(--line) / .10); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgb(var(--line) / .2); background-clip: content-box; border: 3px solid transparent; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  .kbd { font: 500 10.5px/1 'IBM Plex Mono', monospace; white-space: nowrap; padding: 3px 5px; border-radius: 5px; background: rgb(var(--line) / .07); color: rgb(var(--mute)); box-shadow: inset 0 -1px 0 rgb(var(--line) / .08); }
+  .btn-primary { background: rgb(var(--accent)); color: rgb(var(--on-accent)); box-shadow: inset 0 -2px 0 rgb(0 0 0 / .14); transition: transform .15s, filter .2s; white-space: nowrap; }
+  .btn-primary:hover { filter: brightness(1.07); }
+  .btn-primary .kbd { background: rgb(var(--on-accent) / .12); color: rgb(var(--on-accent) / .75); box-shadow: none; }
+  .btn-primary:active { transform: scale(.985); }
+  .seg { background: rgb(var(--line) / .05); border-radius: 9px; padding: 3px; display: flex; gap: 2px; position: relative; min-width: 0; }
+  .seg button { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 550; padding: 6px 10px; border-radius: 6px; color: rgb(var(--mute)); transition: color .15s, background .2s, box-shadow .2s; white-space: nowrap; }
+  .seg button:hover { color: rgb(var(--ink)); }
+  .seg button[aria-pressed=true] { background: rgb(var(--elev)); color: rgb(var(--ink)); box-shadow: 0 1px 2px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(var(--line) / .09); }
+  .light .seg button[aria-pressed=true] { box-shadow: 0 1px 2px rgb(0 0 0 / .12), inset 0 0 0 1px rgb(var(--line) / .06); }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; cursor: pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(90deg, rgb(var(--accent)) var(--p, 50%), rgb(var(--line) / .12) var(--p, 50%)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / .2), 0 2px 8px rgb(0 0 0 / .4), 0 0 0 4px rgb(var(--accent) / .0); transition: box-shadow .2s; }
+  input[type=range]:hover::-webkit-slider-thumb, input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px rgb(0 0 0 / .2), 0 2px 8px rgb(0 0 0 / .4), 0 0 0 5px rgb(var(--accent) / .3); }
+  input[type=range]:focus { outline: none; }
+  .field { background: rgb(var(--line) / .05); border-radius: 9px; box-shadow: inset 0 0 0 1px rgb(var(--line) / var(--line-a)); transition: box-shadow .15s; outline: none; }
+  .field:focus, .field:focus-within { box-shadow: inset 0 0 0 1px rgb(var(--accent) / .8), 0 0 0 3px rgb(var(--accent) / .18); }
+  .toggle { width: 34px; height: 20px; border-radius: 20px; background: rgb(var(--line) / .16); position: relative; transition: background .2s; flex: none; }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s cubic-bezier(.3,1.4,.5,1); box-shadow: 0 1px 3px rgb(0 0 0 / .4); }
+  .toggle[aria-checked=true] { background: rgb(var(--accent)); }
+  .toggle[aria-checked=true]::after { transform: translateX(14px); }
+  .row { transition: background .15s; }
+  .row:hover { background: rgb(var(--line) / .04); }
+  .row[data-sel=true] { background: rgb(var(--accent) / .11); box-shadow: inset 2px 0 0 rgb(var(--accent)); }
+  .row .act { opacity: 0; transition: opacity .15s; }
+  .row:hover .act, .row[data-sel=true] .act { opacity: 1; }
+  .card { transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s; }
+  .card:hover { transform: translateY(-2px); }
+  .card[data-sel=true] { box-shadow: 0 0 0 2px rgb(var(--accent)); }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .rise { animation: rise .35s cubic-bezier(.2,.8,.2,1) both; }
+  .fade { animation: fade .2s both; }
+  .spin { animation: spin .9s linear infinite; }
+  .shimmer { background: linear-gradient(100deg, transparent 20%, rgb(var(--ink) / .14) 50%, transparent 80%) 0 0 / 200% 100%; animation: shimmer 1.4s linear infinite; }
+  .pulse-dot { animation: pulseDot 1.2s ease-in-out infinite; }
+  .glass { background: rgb(var(--elev) / .78); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); }
+  .scrim { background: rgb(0 0 0 / .5); backdrop-filter: blur(6px); }
+  .stack { transform: scale(var(--z, 1)); transform-origin: var(--ox, 50%) var(--oy, 50%); transition: transform .28s cubic-bezier(.2,.8,.2,1); will-change: transform; }
+  .stack.tracking { transition: transform .05s linear; }
+  .divider-handle { box-shadow: 0 0 0 1px rgb(0 0 0 / .25), 0 4px 16px rgb(0 0 0 / .5); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+  :focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; border-radius: 6px; }
+  button { cursor: default; }
+  .font-display { font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif; font-optical-sizing: auto; }
+  .wc { width: 34px; height: 28px; display: grid; place-items: center; border-radius: 6px; color: rgb(var(--mute)); transition: background .15s, color .15s; }
+  .wc:hover { background: rgb(var(--line) / .08); color: rgb(var(--ink)); }
+  .wc.close:hover { background: rgb(var(--bad)); color: #fff; }
+  /* rótulos que somem quando a coluna central fica estreita */
+  main { container-type: inline-size; container-name: main; }
+  .lgrid { display: grid; grid-template-columns: minmax(0,1fr) 128px 112px 128px 60px; }
+  @container main (max-width: 700px) { .lgrid { grid-template-columns: minmax(0,1fr) 108px 118px 56px; } .lgrid > .c-red { display: none; } }
+  @container main (max-width: 660px) { .lbl-c { display: none; } .seg button { padding-inline: 9px; } }
+  @container main (max-width: 560px) { .hide-c { display: none !important; } }
+  @media (max-width: 1180px) { .hide-w { display: none !important; } :root { --side: 212px; --insp: 288px; } }
+</style>
+</head>
+<body>
+
+<!-- ICON SPRITE -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 20h16"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="1.6"/><path d="m21 15-5-5L5 21"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+    <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3M11 8v6M8 11h6"/></symbol>
+    <symbol id="i-cmd" viewBox="0 0 24 24"><path d="M15 6a3 3 0 1 1 3 3H6a3 3 0 1 1 3-3v12a3 3 0 1 1-3-3h12a3 3 0 1 1-3 3z"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16m0 5v-5h5M3 12a9 9 0 0 1 15.5-6.2L21 8m0-5v5h-5"/></symbol>
+    <symbol id="i-cols" viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="2"/><rect x="13" y="4" width="8" height="16" rx="2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-image-plus" viewBox="0 0 24 24"><path d="M21 12v6a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h6"/><circle cx="9" cy="9" r="1.6"/><path d="m21 16-4.5-4.5L6 21M18 3v6M15 6h6"/></symbol>
+    <symbol id="i-min" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+    <symbol id="i-max" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+    <!-- Marca GuepardoSys: um "G" veloz cujo traço interno vira manchas de guepardo que encolhem (= compressão) -->
+    <symbol id="logo-mark" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="8" fill="rgb(var(--accent))"/>
+      <path d="M22.4 9.6A9 9 0 1 0 25 16" fill="none" stroke="rgb(23 17 9)" stroke-width="3.6" stroke-linecap="round"/>
+      <circle cx="19.9" cy="16" r="2.1" fill="rgb(23 17 9)"/>
+      <circle cx="15.5" cy="16" r="1.45" fill="rgb(23 17 9)"/>
+      <circle cx="12.2" cy="16" r=".9" fill="rgb(23 17 9)"/>
+    </symbol>
+    <symbol id="i-bolt-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/></symbol>
+  </defs>
+</svg>
+
+<div id="app" class="h-screen flex flex-col">
+
+  <!-- TITLEBAR (janela sem decoração nativa: Tauri decorations:false + data-tauri-drag-region) -->
+  <header class="h-11 grid grid-cols-[var(--side)_minmax(0,1fr)_auto] items-center gap-3 pl-3 pr-1.5 hair-b bg-panel relative z-30" data-tauri-drag-region>
+    <div class="flex items-center gap-2.5 pl-1 min-w-0">
+      <svg class="w-[22px] h-[22px] flex-none" aria-hidden="true"><use href="#logo-mark"/></svg>
+      <span class="font-display text-[14px] font-bold tracking-[-.02em] leading-none whitespace-nowrap">guepardo<span class="text-mute font-semibold">sys</span> <span class="text-accent font-semibold">compact</span></span>
+    </div>
+
+    <button id="btn-palette" class="justify-self-center flex items-center gap-2.5 h-7 w-full max-w-[380px] min-w-0 px-3 rounded-lg field text-[12px] text-mute hover:text-ink">
+      <svg class="ico ico-sm"><use href="#i-search"/></svg>
+      <span class="flex-1 text-left truncate">Buscar imagem ou comando…</span>
+      <span class="kbd">Ctrl K</span>
+    </button>
+
+    <div class="flex items-center gap-1 justify-end">
+      <button id="btn-update" class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11.5px] font-semibold whitespace-nowrap text-accent bg-accent/10 hover:bg-accent/20 transition" title="Nova versão disponível">
+        <svg class="ico ico-sm"><use href="#i-arrow-up"/></svg><span id="update-label">Atualizar · v0.1.2</span>
+      </button>
+      <button id="btn-theme" class="w-7 h-7 grid place-items-center rounded-lg text-mute hover:text-ink hover:bg-ink/5 transition" aria-label="Alternar tema">
+        <svg class="ico"><use id="theme-ico" href="#i-sun"/></svg>
+      </button>
+      <div class="w-px h-4 bg-ink/10 mx-1.5"></div>
+      <button class="wc" aria-label="Minimizar"><svg class="ico ico-sm"><use href="#i-min"/></svg></button>
+      <button class="wc" aria-label="Maximizar"><svg class="ico ico-sm" style="width:12px;height:12px"><use href="#i-max"/></svg></button>
+      <button class="wc close" aria-label="Fechar"><svg class="ico ico-sm"><use href="#i-x"/></svg></button>
+    </div>
+  </header>
+
+  <div class="flex flex-1 min-h-0">
+
+    <!-- SIDEBAR -->
+    <aside class="w-[var(--side)] flex-none bg-panel/60 hair-r flex flex-col min-h-0">
+      <div class="p-3 pb-2">
+        <div class="grid grid-cols-2 gap-1.5">
+          <button id="btn-add-img" class="h-9 rounded-lg flex items-center justify-center gap-1.5 text-[12.5px] font-semibold whitespace-nowrap bg-ink/[.06] hover:bg-ink/[.10] ring-line transition" title="Adicionar imagens (Ctrl O)">
+            <svg class="ico ico-sm text-accent"><use href="#i-image-plus"/></svg>Imagens
+          </button>
+          <button id="btn-add" class="h-9 rounded-lg flex items-center justify-center gap-1.5 text-[12.5px] font-semibold whitespace-nowrap bg-ink/[.06] hover:bg-ink/[.10] ring-line transition" title="Adicionar pasta (Ctrl Shift O)">
+            <svg class="ico ico-sm text-accent"><use href="#i-folder"/></svg>Pasta
+          </button>
+        </div>
+        <p class="mt-2 text-[11px] text-dim text-center leading-snug">ou arraste para a janela</p>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-2 pb-3 min-h-0">
+        <div class="px-2 pt-1 pb-1.5 flex items-center justify-between">
+          <span class="text-[11.5px] font-semibold text-mute">Origem</span>
+          <span id="side-count" class="text-[10.5px] text-dim tabular-nums"></span>
+        </div>
+        <nav id="folders" class="grid gap-0.5"></nav>
+
+        <div class="px-2 pt-5 pb-1.5 flex items-center justify-between">
+          <span class="text-[11.5px] font-semibold text-mute">Presets</span>
+          <button id="btn-new-preset" class="text-dim hover:text-ink transition" aria-label="Novo preset"><svg class="ico ico-sm"><use href="#i-plus"/></svg></button>
+        </div>
+        <div id="presets" class="grid gap-1"></div>
+      </div>
+
+      <div class="p-3 hair-t">
+        <div class="rounded-lg p-3 ring-line">
+          <div class="flex items-center justify-between text-[11px] text-mute mb-2">
+            <span>Economia acumulada</span><span class="text-ok font-semibold" id="life-pct">68%</span>
+          </div>
+          <div class="text-[19px] font-semibold tracking-tight tabular-nums leading-none">4,82 <span class="text-[12px] font-medium text-mute">GB</span></div>
+          <div class="mt-2.5 h-1.5 rounded-full bg-ink/[.07] overflow-hidden"><div class="h-full rounded-full bg-ok" style="width:68%"></div></div>
+          <div class="mt-2 text-[10.5px] text-dim">1.284 imagens · 100% local</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 min-w-0 flex flex-col min-h-0 relative">
+      <div class="h-12 flex-none px-4 flex items-center gap-3 hair-b">
+        <div class="min-w-[56px] flex items-center gap-2 text-[13px] font-semibold tracking-tight">
+          <span id="crumb-title" class="truncate">Todas</span>
+          <span id="crumb-count" class="hide-c flex-none text-[11px] font-medium text-mute px-1.5 py-0.5 rounded-md bg-ink/[.06] tabular-nums whitespace-nowrap"></span>
+        </div>
+        <div id="filters" class="flex-none flex items-center gap-1"></div>
+        <div class="flex-1"></div>
+        <div class="seg flex-none" id="view-seg">
+          <button data-view="list" aria-pressed="true" title="Lista" class="flex items-center justify-center gap-1.5"><svg class="ico ico-sm"><use href="#i-list"/></svg><span class="lbl-c">Lista</span></button>
+          <button data-view="grid" aria-pressed="false" title="Grade" class="flex items-center justify-center gap-1.5"><svg class="ico ico-sm"><use href="#i-grid"/></svg><span class="lbl-c">Grade</span></button>
+          <button data-view="compare" aria-pressed="false" title="Comparar" class="flex items-center justify-center gap-1.5"><svg class="ico ico-sm"><use href="#i-compare"/></svg><span class="lbl-c">Comparar</span></button>
+        </div>
+      </div>
+
+      <!-- batch banner (resumo + avisos) -->
+      <div id="banner" class="flex-none"></div>
+
+      <div id="stage" class="flex-1 min-h-0 relative overflow-hidden"></div>
+
+      <!-- status bar -->
+      <footer class="h-8 flex-none hair-t px-4 flex items-center gap-4 text-[11px] text-mute bg-panel/60 overflow-hidden">
+        <div id="sb-state" class="flex-none flex items-center gap-2 whitespace-nowrap"></div>
+        <div class="flex-1 min-w-[60px] max-w-[280px] h-1 rounded-full bg-ink/[.07] overflow-hidden"><div id="sb-bar" class="h-full rounded-full bg-accent transition-[width] duration-300" style="width:0"></div></div>
+        <div id="sb-stats" class="tabular-nums flex items-center gap-4 whitespace-nowrap hide-c"></div>
+        <div class="flex-1"></div>
+        <span class="flex items-center gap-1.5 text-dim whitespace-nowrap hide-w" title="Processamento local · nada sai do computador"><svg class="ico ico-sm"><use href="#i-bolt-shield"/></svg>100% local</span>
+      </footer>
+    </main>
+
+    <!-- INSPECTOR -->
+    <aside class="w-[var(--insp)] flex-none bg-panel/60 hair-l flex flex-col min-h-0">
+      <div class="h-12 flex-none px-4 flex items-center justify-between hair-b">
+        <div class="flex items-center gap-2 text-[13px] font-semibold tracking-tight"><svg class="ico ico-sm text-mute"><use href="#i-sliders"/></svg>Saída</div>
+        <span id="preset-chip" class="text-[11px] text-mute flex items-center gap-1.5"></span>
+      </div>
+
+      <div id="inspector" class="flex-1 overflow-y-auto min-h-0 px-4 py-4 grid gap-5 content-start"></div>
+
+      <div class="flex-none p-4 hair-t bg-panel/80 grid gap-3">
+        <div id="summary" class="flex items-end justify-between"></div>
+        <div id="cta" class="grid gap-2"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- OVERLAYS -->
+<div id="overlay" class="hidden fixed inset-0 z-50"></div>
+<div id="dragveil" class="hidden fixed inset-0 z-40 scrim fade grid place-items-center pointer-events-none">
+  <div class="rounded-2xl border-2 border-dashed border-accent/70 bg-panel/90 px-16 py-14 text-center shadow-pop rise">
+    <div class="mx-auto w-14 h-14 rounded-xl grid place-items-center bg-accent/15 text-accent mb-4"><svg class="ico ico-lg"><use href="#i-image-plus"/></svg></div>
+    <div class="font-display text-xl font-bold tracking-tight">Solte imagens ou pastas</div>
+    <div class="text-[13px] text-mute mt-1">Pastas são varridas por completo · cada imagem é salva ao lado da original</div>
+  </div>
+</div>
+<div id="toasts" class="fixed bottom-12 left-1/2 -translate-x-1/2 z-[60] grid gap-2 justify-items-center pointer-events-none"></div>
+
+<script>
+/* ============================================================
+   Protótipo — dados simulados. Nada aqui grava em disco.
+   ============================================================ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const ico = (n, c = '') => `<svg class="ico ${c}"><use href="#i-${n}"/></svg>`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const pt = (n, d = 1) => n.toFixed(d).replace('.', ',');
+const fmt = kb => kb >= 1024 ? pt(kb / 1024, kb >= 10240 ? 1 : 2) + ' MB' : Math.round(kb) + ' KB';
+const pct = n => pt(n, n >= 10 ? 0 : 1) + '%';
+
+/* ---------- geração de imagens de produto (SVG) ---------- */
+function art(it, w = 1200, h = 900) {
+  const hue = it.hue, h2 = (hue + 38) % 360;
+  const shapes = {
+    shirt: `<path d="M420 250 L520 215 Q600 270 680 215 L780 250 L900 370 L810 420 L780 385 L780 700 L420 700 L420 385 L390 420 L300 370 Z" fill="hsl(${hue} 62% 46%)"/><path d="M520 215 Q600 270 680 215 Q680 245 600 262 Q520 245 520 215Z" fill="hsl(${hue} 55% 30%)"/><path d="M600 262 V700" stroke="hsl(${hue} 60% 38%)" stroke-width="3" opacity=".5"/>`,
+    shoe: `<path d="M250 560 Q260 410 380 395 L520 480 Q650 470 770 520 Q905 545 935 615 L935 665 L250 665 Z" fill="hsl(${hue} 70% 55%)"/><rect x="240" y="640" width="705" height="42" rx="21" fill="#f4f4f6"/><path d="M400 430 L480 480 M440 415 L520 470" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".85"/><path d="M700 545 Q820 555 900 610" stroke="hsl(${hue} 60% 38%)" stroke-width="10" fill="none" stroke-linecap="round"/>`,
+    bag: `<path d="M470 350 Q470 190 600 190 Q730 190 730 350" fill="none" stroke="hsl(${hue} 48% 28%)" stroke-width="22" stroke-linecap="round"/><rect x="330" y="340" width="540" height="370" rx="56" fill="hsl(${hue} 58% 44%)"/><path d="M330 440 Q600 520 870 440" fill="none" stroke="hsl(${hue} 50% 30%)" stroke-width="5" opacity=".7"/><rect x="570" y="460" width="60" height="44" rx="10" fill="hsl(${hue} 80% 76%)"/>`,
+    watch: `<rect x="520" y="90" width="160" height="720" rx="60" fill="hsl(${hue} 30% 22%)"/><circle cx="600" cy="450" r="215" fill="#d9dbe3"/><circle cx="600" cy="450" r="185" fill="hsl(${hue} 45% 14%)"/><path d="M600 450 V330 M600 450 L690 500" stroke="#fff" stroke-width="10" stroke-linecap="round"/><circle cx="600" cy="450" r="12" fill="hsl(${hue} 90% 68%)"/>${[...Array(12)].map((_, i) => { const a = i * Math.PI / 6; return `<line x1="${600 + Math.sin(a) * 160}" y1="${450 - Math.cos(a) * 160}" x2="${600 + Math.sin(a) * 175}" y2="${450 - Math.cos(a) * 175}" stroke="#fff" stroke-width="5" opacity=".7"/>`; }).join('')}`,
+    logo: `<circle cx="600" cy="450" r="240" fill="hsl(${hue} 70% 55%)"/><text x="600" y="520" text-anchor="middle" font-family="Inter,Arial" font-weight="700" font-size="240" fill="#fff">A</text>`
+  };
+  const bg = it.shape === 'logo' ? '' : `<rect width="1200" height="900" fill="url(#g)"/><ellipse cx="600" cy="735" rx="330" ry="34" fill="#000" opacity=".22" filter="url(#b)"/>`;
+  const grain = it.shape === 'logo' ? '' : `<rect width="1200" height="900" filter="url(#n)" opacity=".16"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 30% 88%)"/><stop offset="1" stop-color="hsl(${h2} 35% 74%)"/></linearGradient><filter id="b"><feGaussianBlur stdDeviation="16"/></filter><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="${it.id}"/><feColorMatrix values="0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 1 0"/></filter></defs>${bg}${shapes[it.shape]}${grain}</svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+/* ---------- estado ---------- */
+let uid = 0;
+const mk = (folder, name, shape, hue, size, w = 4000, h = 3000, extra = {}) => ({ id: ++uid, folder, name, shape, hue, size, w, h, status: 'pending', out: null, ...extra });
+function sample() {
+  uid = 0;
+  return [
+    ...['frente', 'costas', 'detalhe-gola', 'detalhe-manga', 'modelo-1', 'modelo-2'].map((n, i) => mk('Camiseta Polo Azul', `polo-azul-${n}.jpg`, 'shirt', 215, 2600 + i * 310)),
+    ...['lateral', 'sola', 'frente', 'topo', 'par', 'cadarco', 'box'].map((n, i) => mk('Tênis Runner X', `runner-x-${n}.jpg`, 'shoe', 12 + i * 4, 3100 + i * 240, 4032, 3024, i === 2 ? { existing: true } : i === 4 ? { existing: true } : {})),
+    ...['frente', 'aberta', 'alca', 'zoom-costura', 'lifestyle'].map((n, i) => mk('Bolsa Couro Caramelo', `bolsa-${n}.jpg`, 'bag', 28, 2200 + i * 420, 3600, 2700)),
+    ...['frente', 'perfil', 'pulseira'].map((n, i) => mk('Relógio Aurora', `aurora-${n}.png`, 'watch', 262, 5200 + i * 900, 3200, 3200)),
+    mk('Relógio Aurora', 'icone-loja.png', 'logo', 262, 225, 512, 512, { bloat: true, alpha: true })
+  ];
+}
+
+const PRESETS = [
+  { id: 'store', name: 'Loja', sub: 'WebP · 2000 px · q80', set: { mode: 'quality', format: 'webp', quality: 80, maxW: 2000, sizes: [], name: '{nome}', sub: 'imagens-compactadas' } },
+  { id: 'insta', name: 'Instagram', sub: 'JPG · 1080 px · q85', set: { mode: 'quality', format: 'jpeg', quality: 85, maxW: 1080, sizes: [], name: '{nome}-ig', sub: 'instagram' } },
+  { id: 'catalog', name: 'Catálogo até 300 KB', sub: 'WebP · alvo 300 KB', set: { mode: 'target', format: 'webp', target: 300, maxW: 2000, sizes: [], name: '{nome}', sub: 'catalogo' } },
+  { id: 'max', name: 'Máxima compressão', sub: 'JPG · mozjpeg', set: { mode: 'quality', format: 'jpeg', quality: 60, maxW: 3840, sizes: [], name: '{nome}-min', sub: 'imagens-compactadas' } }
+];
+
+const S = {
+  items: sample(), sel: null, view: 'list', folder: null, filter: 'all', theme: 'dark',
+  preset: 'store',
+  set: { mode: 'quality', format: 'webp', quality: 80, target: 300, maxW: 2000, sizes: [], name: '{nome}', sub: 'imagens-compactadas', useSub: true, conflict: 'ask', bg: '#ffffff', strip: true },
+  run: { active: false, cancel: false, t0: 0, done: 0, total: 0 },
+  compare: { mode: 'slider', pos: 50, zoom: false }
+};
+S.sel = S.items[7].id;
+
+/* ---------- estimativa (simulada) ---------- */
+function estimate(it) {
+  const s = S.set;
+  const wmax = s.sizes.length ? Math.max(...s.sizes) : s.maxW;
+  const sc = Math.min(1, wmax / it.w);
+  const jitter = .86 + ((it.id * 13) % 28) / 100;
+  if (it.bloat && s.format !== 'png') return { kb: it.size * 4.4, q: null };
+  if (s.mode === 'target') {
+    const natural = it.size * sc * sc * .55;
+    const kb = Math.min(natural, s.target * (.92 + ((it.id * 7) % 7) / 100));
+    return { kb, q: Math.round(62 + ((it.id * 11) % 20)) };
+  }
+  const base = { webp: .46, avif: .33, jpeg: .62, png: 1.5 }[s.format];
+  const q = s.format === 'png' ? 1 : .25 + s.quality / 100 * .9;
+  return { kb: it.size * base * q * sc * sc * jitter, q: null };
+}
+const reduction = it => it.out == null ? null : (1 - it.out / it.size) * 100;
+const preview = it => estimate(it).kb;
+const visible = () => S.items.filter(i => (!S.folder || i.folder === S.folder) && (S.filter === 'all' || (S.filter === 'warn' && (i.status === 'kept' || (i.existing && i.status === 'pending') || i.alpha)) || (S.filter === 'done' && i.status === 'done')));
+const selected = () => S.items.find(i => i.id === S.sel);
+const folders = () => [...new Set(S.items.map(i => i.folder))];
+const outName = it => {
+  const base = it.name.replace(/\.[^.]+$/, '');
+  const ext = { webp: 'webp', jpeg: 'jpg', png: 'png', avif: 'avif' }[S.set.format];
+  const w = S.set.sizes.length ? S.set.sizes[0] : Math.min(S.set.maxW, it.w);
+  return S.set.name.replace('{nome}', base).replace('{largura}', Math.min(w, it.w)).replace('{formato}', ext).replace('{pasta}', it.folder.toLowerCase().replace(/\s+/g, '-')) + '.' + ext;
+};
+
+/* ---------- toasts ---------- */
+function toast(msg, kind = 'ok', ms = 3200) {
+  const el = document.createElement('div');
+  const c = { ok: 'text-ok', warn: 'text-warn', bad: 'text-bad', info: 'text-accent' }[kind];
+  const i = { ok: 'check', warn: 'alert', bad: 'x', info: 'info' }[kind];
+  el.className = 'rise glass rounded-lg px-3.5 py-2.5 text-[12.5px] shadow-pop flex items-center gap-2.5 pointer-events-auto';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<span class="${c}">${ico(i)}</span><span>${msg}</span>`;
+  $('#toasts').append(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s, transform .3s'; el.style.opacity = 0; el.style.transform = 'translateY(6px)'; setTimeout(() => el.remove(), 300); }, ms);
+}
+
+/* ---------- render: sidebar ---------- */
+function renderSide() {
+  const fs = folders();
+  $('#side-count').textContent = fs.length;
+  const row = (name, count, done, warn, active, key) => {
+    const state = done === count ? 'bg-ok' : done > 0 ? 'bg-accent' : 'bg-ink/20';
+    return `<button data-folder="${key}" class="group flex items-center gap-2.5 h-8 px-2 rounded-lg text-[12.5px] text-left transition ${active ? 'bg-ink/[.08] text-ink' : 'text-mute hover:bg-ink/[.04] hover:text-ink'}">
+      <span class="${active ? 'text-accent' : 'text-dim group-hover:text-mute'}">${ico('folder', 'ico-sm')}</span>
+      <span class="flex-1 truncate">${name}</span>
+      ${warn ? `<span class="text-warn" title="Atenção">${ico('alert', 'ico-sm')}</span>` : ''}
+      <span class="text-[10.5px] tabular-nums text-dim">${done > 0 && done < count ? done + '/' : ''}${count}</span>
+      <span class="w-1.5 h-1.5 rounded-full ${state}"></span></button>`;
+  };
+  $('#folders').innerHTML =
+    row('Todas', S.items.length, S.items.filter(i => i.status === 'done' || i.status === 'kept').length, false, !S.folder, '') +
+    fs.map(f => {
+      const its = S.items.filter(i => i.folder === f);
+      return row(f, its.length, its.filter(i => i.status === 'done' || i.status === 'kept').length, its.some(i => i.status === 'kept'), S.folder === f, f);
+    }).join('');
+  $$('#folders [data-folder]').forEach(b => b.onclick = () => { S.folder = b.dataset.folder || null; render(); });
+
+  $('#presets').innerHTML = PRESETS.map(p => `
+    <button data-preset="${p.id}" class="text-left rounded-[10px] px-2.5 py-2 transition ${S.preset === p.id ? 'bg-accent/12 ring-line' : 'hover:bg-ink/[.04]'}" style="${S.preset === p.id ? 'box-shadow: inset 0 0 0 1px rgb(var(--accent) / .45)' : ''}">
+      <div class="flex items-center justify-between"><span class="text-[12.5px] font-550 ${S.preset === p.id ? 'text-ink' : 'text-ink/90'}">${p.name}</span>${S.preset === p.id ? `<span class="text-accent">${ico('check', 'ico-sm')}</span>` : ''}</div>
+      <div class="text-[11px] text-mute mt-0.5">${p.sub}</div></button>`).join('');
+  $$('#presets [data-preset]').forEach(b => b.onclick = () => applyPreset(b.dataset.preset));
+}
+
+function applyPreset(id) {
+  const p = PRESETS.find(x => x.id === id);
+  S.preset = id; Object.assign(S.set, p.set);
+  S.items.forEach(i => { if (i.status !== 'processing') { i.status = 'pending'; i.out = null; } });
+  toast(`Preset <b>${p.name}</b> aplicado`, 'info');
+  render();
+}
+
+/* ---------- render: toolbar / banner ---------- */
+function renderToolbar() {
+  const list = visible();
+  $('#crumb-title').textContent = S.folder || 'Todas';
+  $('#crumb-count').textContent = list.length + ' imagens';
+  const warnN = S.items.filter(i => i.status === 'kept' || (i.existing && i.status === 'pending') || i.alpha).length;
+  const doneN = S.items.filter(i => i.status === 'done').length;
+  const chip = (k, label, n) => `<button data-f="${k}" class="h-7 px-2.5 rounded-lg text-[12px] font-550 whitespace-nowrap transition flex items-center gap-1.5 ${S.filter === k ? 'bg-ink/[.09] text-ink' : 'text-mute hover:text-ink hover:bg-ink/[.04]'}">${label}${n != null ? `<span class="text-[10.5px] tabular-nums ${k === 'warn' && n ? 'text-warn' : 'text-dim'}">${n}</span>` : ''}</button>`;
+  $('#filters').innerHTML = chip('all', 'Todas') + chip('done', 'Prontas', doneN) + chip('warn', 'Atenção', warnN);
+  $$('#filters [data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
+  $$('#view-seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === S.view));
+}
+
+function renderBanner() {
+  const done = S.items.filter(i => i.status === 'done' || i.status === 'kept');
+  const el = $('#banner');
+  if (!done.length || S.run.active || done.length < S.items.filter(i => i.status !== 'skipped').length) { el.innerHTML = ''; return; }
+  const before = done.reduce((a, i) => a + i.size, 0), after = done.reduce((a, i) => a + i.out, 0);
+  const kept = S.items.filter(i => i.status === 'kept').length;
+  el.innerHTML = `<div class="rise mx-4 mt-3 rounded-lg px-4 py-3 flex items-center gap-4 ring-line bg-ok/[.06]">
+    <div class="w-9 h-9 flex-none rounded-lg grid place-items-center bg-ok/15 text-ok">${ico('check')}</div>
+    <div class="min-w-0 flex-1">
+      <div class="text-[13.5px] font-semibold tracking-tight truncate">Lote concluído · ${done.length} imagens${kept ? ` <span class="text-warn font-medium text-[12px] whitespace-nowrap">· ${kept} ${kept > 1 ? 'mantidas' : 'mantida'} no original</span>` : ''}</div>
+      <div class="text-[12px] text-mute mt-0.5 tabular-nums truncate">${fmt(before)} <span class="text-dim">→</span> <span class="text-ink font-550">${fmt(after)}</span> · economia de <span class="text-ok font-semibold">${fmt(before - after)}</span> (${pct((1 - after / before) * 100)})</div>
+    </div>
+    <button id="bn-report" title="Relatório" class="flex-none whitespace-nowrap h-8 px-3 rounded-lg text-[12px] font-550 bg-ink/[.07] hover:bg-ink/[.12] transition flex items-center gap-2">${ico('file', 'ico-sm')}<span class="lbl-c">Relatório</span></button>
+    <button id="bn-open" title="Abrir pasta" class="flex-none whitespace-nowrap h-8 px-3 rounded-lg text-[12px] font-550 bg-ink/[.07] hover:bg-ink/[.12] transition flex items-center gap-2">${ico('external', 'ico-sm')}<span class="lbl-c">Abrir pasta</span></button>
+  </div>`;
+  $('#bn-report').onclick = openReport;
+  $('#bn-open').onclick = () => toast('Abrindo <b>imagens-compactadas</b> no gerenciador de arquivos…', 'info');
+}
+
+/* ---------- render: status chip ---------- */
+function statusChip(it) {
+  const m = {
+    pending: ['Na fila', 'text-dim bg-ink/[.05]', ''],
+    processing: ['Compactando', 'text-accent bg-accent/12', '<span class="w-1.5 h-1.5 rounded-full bg-accent pulse-dot"></span>'],
+    done: ['Pronta', 'text-ok bg-ok/12', ico('check', 'ico-sm')],
+    kept: ['Original mantido', 'text-warn bg-warn/12', ico('alert', 'ico-sm')],
+    skipped: ['Ignorada', 'text-mute bg-ink/[.06]', ''],
+    error: ['Erro', 'text-bad bg-bad/12', ico('x', 'ico-sm')]
+  }[it.status];
+  return `<span class="inline-flex items-center gap-1.5 h-[22px] px-2 rounded-full text-[11px] font-550 whitespace-nowrap ${m[1]}">${m[2]}${m[0]}</span>`;
+}
+
+/* ---------- render: lista ---------- */
+function renderList(list) {
+  const groups = {};
+  list.forEach(i => (groups[i.folder] ||= []).push(i));
+  const maxOut = Math.max(...S.items.map(i => i.size));
+  let h = `<div class="h-full overflow-y-auto">
+    <div class="sticky top-0 z-10 grid lgrid gap-2.5 px-5 h-8 items-center text-[11px] font-semibold text-dim bg-bg hair-b">
+      <span>Arquivo</span><span>Tamanho</span><span class="c-red">Redução</span><span>Status</span><span></span></div>`;
+  for (const [f, its] of Object.entries(groups)) {
+    const b = its.reduce((a, i) => a + i.size, 0);
+    h += `<div class="px-5 pt-4 pb-1.5 flex items-center gap-2 text-[11.5px] text-mute min-w-0"><span class="text-dim flex-none">${ico('folder', 'ico-sm')}</span><span class="font-600 text-ink/90 truncate">${f}</span><span class="text-dim">·</span><span class="tabular-nums whitespace-nowrap">${its.length} fotos · ${fmt(b)}</span><span class="text-dim ml-1 truncate min-w-0 hide-c">→ <span class="font-mono text-[10.5px]">${f}/${S.set.useSub ? S.set.sub + '/' : ''}</span></span></div>`;
+    for (const it of its) {
+      const r = reduction(it);
+      const est = preview(it);
+      const showOut = it.out != null;
+      h += `<div class="row group grid lgrid gap-2.5 px-5 h-[54px] items-center rise" data-id="${it.id}" data-sel="${S.sel === it.id}" style="animation-delay:${Math.min(list.indexOf(it), 12) * 14}ms">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 rounded-lg overflow-hidden flex-none ring-line ${it.alpha ? 'checker' : ''}"><img src="${art(it, 96, 72)}" class="w-full h-full object-cover" alt=""/></div>
+          <div class="min-w-0">
+            <div class="text-[12.5px] font-550 flex items-center gap-2 min-w-0"><span class="truncate">${it.name}</span>${it.alpha ? '<span class="text-[10px] px-1.5 py-px rounded bg-ink/[.07] text-mute font-medium">alpha</span>' : ''}${it.existing && it.status === 'pending' ? `<span title="Já existe no destino" class="text-warn">${ico('alert', 'ico-sm')}</span>` : ''}</div>
+            <div class="text-[11px] text-dim tabular-nums truncate">${it.w} × ${it.h}${showOut ? ` · <span class="font-mono text-[10.5px]">${it.status === 'kept' ? it.name : outName(it)}</span>` : ''}</div>
+          </div>
+        </div>
+        <div class="text-[12px] tabular-nums whitespace-nowrap truncate">${showOut ? `<span class="text-mute">${fmt(it.size)}</span> <span class="text-dim">→</span> <span class="font-600 ${it.status === 'kept' ? 'text-warn' : ''}">${fmt(it.out)}</span>` : `<span class="text-mute">${fmt(it.size)}</span> <span class="text-dim">→</span> <span class="text-dim">~${fmt(est)}</span>`}</div>
+        <div class="c-red flex items-center gap-2.5">
+          ${showOut && it.status === 'done' ? `<div class="flex-1 h-1.5 rounded-full bg-ink/[.06] overflow-hidden"><div class="h-full rounded-full" style="width:${Math.max(4, r)}%;background:linear-gradient(90deg,rgb(var(--ok)),rgb(var(--ok)/.6))"></div></div><span class="flex-none text-[12px] font-600 text-ok tabular-nums text-right">−${pct(r)}</span>`
+            : it.status === 'kept' ? `<span class="text-[12px] font-600 text-warn tabular-nums" title="A saída ficaria maior que o original">+${pct(-((1 - it.est / it.size) * 100))}</span>`
+            : it.status === 'processing' ? `<div class="flex-1 h-1.5 rounded-full overflow-hidden bg-ink/[.06]"><div class="h-full w-full shimmer"></div></div>`
+            : `<span class="text-[11.5px] text-dim">—</span>`}
+        </div>
+        <div class="min-w-0">${statusChip(it)}</div>
+        <div class="flex items-center justify-end">
+          <span class="act flex">
+            ${it.status === 'done' || it.status === 'kept' ? `<button data-dl="${it.id}" class="w-7 h-7 grid place-items-center rounded-md text-mute hover:text-ink hover:bg-ink/[.08]" aria-label="Baixar">${ico('download', 'ico-sm')}</button>` : ''}
+            <button data-rm="${it.id}" class="w-7 h-7 grid place-items-center rounded-md text-mute hover:text-bad hover:bg-ink/[.08]" aria-label="Remover">${ico('x', 'ico-sm')}</button>
+          </span>
+        </div>
+      </div>`;
+    }
+  }
+  h += `<div class="h-6"></div></div>`;
+  return h;
+}
+
+/* ---------- render: grade ---------- */
+function renderGrid(list) {
+  return `<div class="h-full overflow-y-auto p-5"><div class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(178px,1fr))">${list.map((it, n) => `
+    <button class="card text-left rounded-xl overflow-hidden bg-elev ring-line rise" data-id="${it.id}" data-sel="${S.sel === it.id}" style="animation-delay:${Math.min(n, 14) * 18}ms">
+      <div class="aspect-[4/3] relative overflow-hidden ${it.alpha ? 'checker' : ''}">
+        <img src="${art(it, 360, 270)}" class="w-full h-full object-cover" alt=""/>
+        <div class="absolute top-2 left-2">${statusChip(it)}</div>
+        ${it.status === 'done' ? `<div class="absolute bottom-2 right-2 h-6 px-2 rounded-md grid place-items-center text-[11px] font-700 tabular-nums" style="background:rgb(var(--ok));color:rgb(20 30 22)">−${pct(reduction(it))}</div>` : ''}
+      </div>
+      <div class="p-3">
+        <div class="text-[12px] font-550 truncate">${it.name}</div>
+        <div class="text-[11px] text-dim mt-0.5 tabular-nums truncate">${fmt(it.size)}${it.out != null ? ` → <span class="text-ink/90">${fmt(it.out)}</span>` : ''}</div>
+      </div>
+    </button>`).join('')}</div></div>`;
+}
+
+/* ---------- render: comparar ---------- */
+function renderCompare(list) {
+  const it = selected() || list[0];
+  if (!it) return '';
+  const done = it.out != null;
+  const r = reduction(it);
+  const strip = list.map(x => `<button data-id="${x.id}" class="relative flex-none w-[84px] h-[62px] rounded-lg overflow-hidden transition ${x.id === it.id ? 'ring-2 ring-accent scale-100' : 'opacity-60 hover:opacity-100'}"><img src="${art(x, 168, 126)}" class="w-full h-full object-cover" alt="${x.name}"/>${x.status === 'done' ? `<span class="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-ok grid place-items-center text-black">${ico('check', 'ico-sm')}</span>` : ''}${x.status === 'kept' ? `<span class="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-warn grid place-items-center text-black text-[10px] font-bold leading-none">!</span>` : ''}</button>`).join('');
+  const c = S.compare;
+  return `<div class="h-full flex flex-col">
+    <div class="flex-none px-5 py-3 flex items-center gap-3 min-w-0">
+      <div class="min-w-0 flex-1">
+        <div class="text-[13px] font-600 truncate">${it.name}</div>
+        <div class="text-[11px] text-dim tabular-nums truncate">${it.w} × ${it.h} px · ${it.folder}</div>
+      </div>
+      <div class="flex-none flex items-center gap-4 text-[12px] tabular-nums whitespace-nowrap">
+        <div class="hide-c"><div class="text-[11px] text-dim font-550">Original</div><div class="font-600">${fmt(it.size)}</div></div>
+        <div class="text-dim hide-c">${ico('arrow-up', 'ico-sm').replace('<svg', '<svg style="transform:rotate(90deg)"')}</div>
+        <div><div class="text-[11px] text-dim font-550">${done ? 'Saída' : 'Estimada'}</div><div class="font-600 ${it.status === 'kept' ? 'text-warn' : ''}">${done ? fmt(it.out) : '~' + fmt(preview(it))}</div></div>
+        ${done && it.status === 'done' ? `<div class="px-2 h-7 rounded-md grid place-items-center text-[12.5px] font-700 text-ok bg-ok/12">−${pct(r)}</div>` : ''}
+      </div>
+      <div class="seg flex-none" id="cmp-mode">
+        <button data-m="slider" aria-pressed="${c.mode === 'slider'}" title="Divisor" class="flex items-center justify-center gap-1.5">${ico('compare', 'ico-sm')}<span class="lbl-c">Divisor</span></button>
+        <button data-m="side" aria-pressed="${c.mode === 'side'}" title="Lado a lado" class="flex items-center justify-center gap-1.5">${ico('cols', 'ico-sm')}<span class="lbl-c">Lado a lado</span></button>
+      </div>
+      <button id="cmp-zoom" aria-pressed="${c.zoom}" title="Ver em 100%" class="flex-none h-[36px] px-3 rounded-[9px] text-[12px] font-550 whitespace-nowrap flex items-center gap-1.5 transition ${c.zoom ? 'bg-accent text-onaccent' : 'bg-ink/[.06] text-mute hover:text-ink'}">${ico('zoom', 'ico-sm')}100%</button>
+    </div>
+    ${it.status === 'kept' ? `<div class="mx-5 mb-2 rounded-lg px-3.5 py-2.5 text-[12px] flex items-center gap-2.5 text-warn bg-warn/10">${ico('alert', 'ico-sm')}O resultado (${fmt(it.est)}) ficou maior que o original. O app manteve o arquivo original para não piorar a loja.</div>` : ''}
+    <div class="flex-1 min-h-0 px-5 pb-3">
+      <div id="viewer" class="h-full rounded-xl overflow-hidden relative checker ring-line" style="--z:${c.zoom ? 2.6 : 1}">
+        ${c.mode === 'slider' ? `
+          <div class="absolute inset-0"><div class="stack absolute inset-0"><img src="${art(it)}" class="w-full h-full object-contain" alt="Original"/></div></div>
+          <div class="absolute inset-0" id="after-wrap" style="clip-path:inset(0 0 0 ${c.pos}%)"><div class="stack absolute inset-0"><img src="${art(it)}" class="w-full h-full object-contain" style="filter:${done ? 'blur(.7px) saturate(.96) contrast(1.03)' : 'none'}" alt="Saída"/></div></div>
+          <div id="divider" class="absolute top-0 bottom-0 w-px bg-white/90 cursor-ew-resize" style="left:${c.pos}%">
+            <div class="divider-handle absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-white text-black grid place-items-center"><svg class="ico" style="stroke-width:2.2"><use href="#i-cols"/></svg></div>
+          </div>
+          <span class="absolute left-3 top-3 glass rounded-md px-2 py-1 text-[11px] font-600 whitespace-nowrap">Original</span>
+          <span class="absolute right-3 top-3 glass rounded-md px-2 py-1 text-[11px] font-600 whitespace-nowrap text-accent">Saída · ${outFormatLabel()}</span>` : `
+          <div class="absolute inset-0 grid grid-cols-2 gap-px bg-ink/10">
+            <div class="relative overflow-hidden bg-black/20"><div class="stack absolute inset-0"><img src="${art(it)}" class="w-full h-full object-contain" alt="Original"/></div><span class="absolute left-3 top-3 glass rounded-md px-2 py-1 text-[11px] font-600 whitespace-nowrap">Original · ${fmt(it.size)}</span></div>
+            <div class="relative overflow-hidden bg-black/20"><div class="stack absolute inset-0"><img src="${art(it)}" class="w-full h-full object-contain" style="filter:${done ? 'blur(.7px) saturate(.96) contrast(1.03)' : 'none'}" alt="Saída"/></div><span class="absolute left-3 top-3 glass rounded-md px-2 py-1 text-[11px] font-600 whitespace-nowrap text-accent">Saída · ${done ? fmt(it.out) : '~' + fmt(preview(it))}</span></div>
+          </div>`}
+        <div class="absolute bottom-3 left-1/2 -translate-x-1/2 glass rounded-full px-3 py-1.5 text-[11px] text-mute flex items-center gap-2 pointer-events-none whitespace-nowrap max-w-[90%] overflow-hidden text-ellipsis">${c.zoom ? 'Mova o mouse para inspecionar detalhes' : 'Ative 100% para inspecionar bordas e textura'}</div>
+      </div>
+    </div>
+    <div class="flex-none h-[86px] hair-t px-5 flex items-center gap-2 overflow-x-auto bg-panel/50">${strip}</div>
+  </div>`;
+}
+const outFormatLabel = () => ({ webp: 'WebP', jpeg: 'JPG', png: 'PNG', avif: 'AVIF' }[S.set.format]);
+
+function wireCompare() {
+  const v = $('#viewer'); if (!v) return;
+  $$('#cmp-mode button').forEach(b => b.onclick = () => { S.compare.mode = b.dataset.m; render(); });
+  $('#cmp-zoom').onclick = () => { S.compare.zoom = !S.compare.zoom; render(); };
+  const div = $('#divider');
+  if (div) {
+    let drag = false;
+    const setPos = e => { const r = v.getBoundingClientRect(); S.compare.pos = Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)); div.style.left = S.compare.pos + '%'; $('#after-wrap').style.clipPath = `inset(0 0 0 ${S.compare.pos}%)`; };
+    v.addEventListener('pointerdown', e => { drag = true; v.setPointerCapture(e.pointerId); setPos(e); });
+    v.addEventListener('pointerup', () => drag = false);
+    v.addEventListener('pointermove', e => { if (drag) setPos(e); });
+  }
+  v.addEventListener('pointermove', e => {
+    if (!S.compare.zoom) return;
+    const r = v.getBoundingClientRect();
+    const ox = ((e.clientX - r.left) / r.width * 100) + '%', oy = ((e.clientY - r.top) / r.height * 100) + '%';
+    $$('.stack', v).forEach(s => { s.classList.add('tracking'); s.style.setProperty('--ox', ox); s.style.setProperty('--oy', oy); });
+  });
+}
+
+/* ---------- render: estado vazio ---------- */
+function renderEmpty() {
+  return `<div class="h-full grid place-items-center p-10"><div class="max-w-[440px] w-full rise">
+    <div class="rounded-xl border-2 border-dashed border-ink/15 px-8 py-10 text-center">
+      <svg class="mx-auto w-11 h-11 mb-5" aria-hidden="true"><use href="#logo-mark"/></svg>
+      <div class="font-display text-[22px] font-bold tracking-[-.02em] leading-tight">Arraste imagens ou pastas</div>
+      <p class="text-[13px] text-mute mt-2 leading-relaxed">Solte fotos soltas ou a pasta inteira do produto. Cada imagem é salva em <span class="font-mono text-[11.5px] px-1.5 py-0.5 rounded bg-ink/[.07] whitespace-nowrap">imagens-compactadas</span> ao lado da original.</p>
+      <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
+        <button id="em-img" class="btn-primary h-10 px-4 rounded-lg text-[13px] font-600 flex items-center gap-2">${ico('image-plus', 'ico-sm')}Escolher imagens</button>
+        <button id="em-add" class="h-10 px-4 rounded-lg text-[13px] font-550 whitespace-nowrap bg-ink/[.07] hover:bg-ink/[.11] transition flex items-center gap-2">${ico('folder', 'ico-sm')}Escolher pasta</button>
+      </div>
+      <button id="em-paste" class="mt-3 text-[12px] text-mute hover:text-ink inline-flex items-center gap-1.5">${ico('clip', 'ico-sm')}ou cole da área de transferência <span class="kbd">Ctrl V</span></button>
+    </div>
+    <div class="mt-4 text-center text-[11.5px] text-dim">JPG · PNG · WebP · AVIF · HEIC</div>
+  </div></div>`;
+}
+
+/* ---------- render: inspector ---------- */
+function renderInspector() {
+  const s = S.set;
+  const lbl = (t, right = '') => `<div class="flex items-center justify-between mb-2"><span class="text-[12px] font-600 text-ink/80">${t}</span>${right}</div>`;
+  const tgl = (id, label, on, sub = '') => `<div class="flex items-center justify-between gap-3 py-1"><div><div class="text-[12.5px]">${label}</div>${sub ? `<div class="text-[11px] text-dim mt-0.5">${sub}</div>` : ''}</div><button class="toggle" role="switch" aria-checked="${on}" data-tgl="${id}" aria-label="${label}"></button></div>`;
+  const sample = selected() || S.items[0] || { name: 'foto-produto.jpg', w: 4000, folder: 'Produto' };
+  const fmtCards = [['webp', 'WebP', 'melhor equilíbrio'], ['jpeg', 'JPG', 'compatível'], ['avif', 'AVIF', 'menor arquivo'], ['png', 'PNG', 'sem perdas']];
+  const hasAlpha = S.items.some(i => i.alpha);
+  $('#preset-chip').innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-accent"></span>${PRESETS.find(p => p.id === S.preset)?.name ?? 'Personalizado'}`;
+
+  $('#inspector').innerHTML = `
+    <section>
+      ${lbl('Formato')}
+      <div class="grid grid-cols-2 gap-2">${fmtCards.map(([v, n, d]) => `<button data-fmt="${v}" class="text-left rounded-[10px] px-3 py-2 transition ${s.format === v ? 'bg-accent/12' : 'bg-ink/[.04] hover:bg-ink/[.07]'}" style="box-shadow:inset 0 0 0 1px ${s.format === v ? 'rgb(var(--accent)/.6)' : 'rgb(var(--line)/var(--line-a))'}"><div class="text-[13px] font-600">${n}</div><div class="text-[10.5px] text-mute">${d}</div></button>`).join('')}</div>
+    </section>
+
+    <section>
+      ${lbl('Como compactar')}
+      <div class="seg" id="mode-seg"><button data-mode="quality" aria-pressed="${s.mode === 'quality'}" class="flex items-center justify-center gap-1.5">${ico('sliders', 'ico-sm')}Qualidade</button><button data-mode="target" aria-pressed="${s.mode === 'target'}" class="flex items-center justify-center gap-1.5">${ico('target', 'ico-sm')}Tamanho-alvo</button></div>
+      <div class="mt-3.5">
+      ${s.mode === 'quality' ? (s.format === 'png' ? `<div class="text-[12px] text-mute rounded-lg bg-ink/[.04] px-3 py-2.5">PNG é sem perdas — o ganho vem do redimensionamento e da otimização.</div>` : `
+        <div class="flex items-center justify-between mb-1"><span class="text-[12px] text-mute">Qualidade</span><span class="text-[13px] font-650 tabular-nums" id="q-val">${s.quality}%</span></div>
+        <input type="range" min="10" max="100" value="${s.quality}" id="q-range" style="--p:${(s.quality - 10) / 90 * 100}%" aria-label="Qualidade"/>
+        <div class="flex justify-between text-[10.5px] text-dim mt-1"><span>Menor arquivo</span><span>Mais nítido</span></div>`) : `
+        <div class="flex items-center justify-between mb-1"><span class="text-[12px] text-mute">Peso máximo por imagem</span><span class="text-[13px] font-650 tabular-nums" id="t-val">${s.target} KB</span></div>
+        <input type="range" min="50" max="1500" step="10" value="${s.target}" id="t-range" style="--p:${(s.target - 50) / 1450 * 100}%" aria-label="Peso máximo"/>
+        <div class="flex gap-1.5 mt-2.5">${[100, 200, 300, 500, 1000].map(v => `<button data-tv="${v}" class="flex-1 h-6 rounded-md text-[11px] font-550 transition ${s.target === v ? 'bg-accent/20 text-accent' : 'bg-ink/[.05] text-mute hover:text-ink'}">${v >= 1000 ? '1 MB' : v}</button>`).join('')}</div>
+        <div class="mt-3 flex items-start gap-2 text-[11.5px] text-mute rounded-lg bg-accent/[.08] px-3 py-2.5">${ico('info', 'ico-sm text-accent mt-px')}<span>O app busca a <b class="text-ink">maior qualidade</b> que ainda cabe em ${s.target} KB, imagem por imagem.</span></div>`}
+      </div>
+    </section>
+
+    <section>
+      ${lbl('Dimensões', `<span class="text-[11px] text-dim flex items-center gap-1">${ico('lock', 'ico-sm')}proporção fixa</span>`)}
+      <div class="flex items-center gap-2">
+        <div class="field flex items-center h-9 px-3 flex-1"><input id="maxw" type="number" value="${s.maxW}" class="bg-transparent outline-none w-full text-[13px] tabular-nums" aria-label="Largura máxima" ${s.sizes.length ? 'disabled style="opacity:.4"' : ''}/><span class="text-[11px] text-dim">px</span></div>
+        <div class="seg flex-none" id="w-seg">${[1080, 2000, 3840].map(v => `<button data-w="${v}" aria-pressed="${s.maxW === v && !s.sizes.length}" class="!px-2.5">${v === 3840 ? '4K' : v}</button>`).join('')}</div>
+      </div>
+      <div class="mt-3">
+        <div class="flex items-center justify-between mb-1.5"><span class="text-[12px] text-mute flex items-center gap-1.5">${ico('layers', 'ico-sm')}Vários tamanhos</span><span class="text-[11px] text-dim">${s.sizes.length ? s.sizes.length + ' por imagem' : 'desligado'}</span></div>
+        <div class="flex gap-1.5">${[2000, 1200, 600].map(v => `<button data-sz="${v}" class="flex-1 h-8 rounded-lg text-[12px] font-550 tabular-nums transition ${s.sizes.includes(v) ? 'bg-accent/20 text-accent' : 'bg-ink/[.05] text-mute hover:text-ink'}" style="${s.sizes.includes(v) ? 'box-shadow:inset 0 0 0 1px rgb(var(--accent)/.5)' : ''}">${v}</button>`).join('')}</div>
+        <div class="text-[10.5px] text-dim mt-1.5">Ex.: 2000 = zoom · 1200 = página · 600 = miniatura</div>
+      </div>
+      <div class="mt-2.5 text-[11px] text-dim flex items-center gap-1.5">${ico('bolt-shield', 'ico-sm')}Nunca amplia imagens menores que o limite</div>
+    </section>
+
+    ${s.format === 'jpeg' && hasAlpha ? `<section class="rise rounded-lg bg-warn/[.08] p-3 ring-line" style="box-shadow:inset 0 0 0 1px rgb(var(--warn)/.3)">
+      <div class="flex items-start gap-2 text-[12px] text-warn font-550">${ico('alert', 'ico-sm mt-px')}1 PNG com transparência vai para JPG</div>
+      <div class="flex items-center gap-2.5 mt-2.5"><span class="text-[11.5px] text-mute">Cor de fundo</span><div class="flex gap-1.5">${['#ffffff', '#f5f5f4', '#111111', '#e7d6bd'].map(c => `<button data-bg="${c}" class="w-6 h-6 rounded-full transition" style="background:${c};box-shadow:${s.bg === c ? '0 0 0 2px rgb(var(--panel)),0 0 0 4px rgb(var(--accent))' : 'inset 0 0 0 1px rgb(128 128 128/.4)'}" aria-label="Fundo ${c}"></button>`).join('')}</div></div></section>` : ''}
+
+    <section>
+      ${lbl('Arquivos de saída')}
+      <div class="grid gap-3">
+        <div>
+          <div class="text-[11.5px] text-mute mb-1.5">Padrão do nome</div>
+          <div class="field h-9 flex items-center px-3"><input id="namepat" value="${s.name}" class="bg-transparent outline-none w-full font-mono text-[12px]" spellcheck="false" aria-label="Padrão do nome"/></div>
+          <div class="flex flex-wrap gap-1.5 mt-2">${['{nome}', '{largura}', '{formato}', '{pasta}'].map(t => `<button data-tok="${t}" class="font-mono text-[10.5px] px-1.5 py-1 rounded-md bg-ink/[.05] text-mute hover:text-ink hover:bg-ink/[.09] transition">${t}</button>`).join('')}</div>
+          <div class="mt-2 text-[11px] text-dim">Resultado: <span class="font-mono text-ink/90 text-[11px]">${outName(sample)}</span></div>
+        </div>
+        <div class="rounded-lg ring-line p-3 grid gap-2.5">
+          ${tgl('useSub', 'Salvar em subpasta', s.useSub, 'dentro da pasta de cada produto')}
+          ${s.useSub ? `<div class="field h-9 flex items-center px-3"><span class="text-dim mr-1">${ico('folder', 'ico-sm')}</span><input id="subname" value="${s.sub}" class="bg-transparent outline-none w-full font-mono text-[12px]" aria-label="Nome da subpasta"/></div>` : ''}
+        </div>
+        <div>
+          <div class="text-[11.5px] text-mute mb-1.5">Se o arquivo já existir</div>
+          <div class="seg !grid grid-cols-2" id="conf-seg">${[['ask', 'Perguntar'], ['overwrite', 'Sobrescrever'], ['skip', 'Pular'], ['rename', 'Renomear']].map(([v, l]) => `<button data-conf="${v}" aria-pressed="${s.conflict === v}">${l}</button>`).join('')}</div>
+        </div>
+        ${tgl('strip', 'Remover metadados (EXIF)', s.strip, 'mantém o perfil de cor ICC')}
+      </div>
+    </section>
+
+    <button id="save-preset" class="h-9 rounded-[10px] text-[12px] font-550 text-mute hover:text-ink bg-ink/[.04] hover:bg-ink/[.08] transition flex items-center justify-center gap-2">${ico('plus', 'ico-sm')}Salvar como novo preset</button>
+  `;
+  wireInspector();
+}
+
+function custom() { S.preset = null; renderSide(); }
+function wireInspector() {
+  const s = S.set, I = $('#inspector');
+  $$('[data-fmt]', I).forEach(b => b.onclick = () => { s.format = b.dataset.fmt; custom(); softRefresh(); });
+  $$('[data-mode]', I).forEach(b => b.onclick = () => { s.mode = b.dataset.mode; custom(); softRefresh(); });
+  const q = $('#q-range', I); if (q) q.oninput = () => { s.quality = +q.value; q.style.setProperty('--p', (s.quality - 10) / 90 * 100 + '%'); $('#q-val').textContent = s.quality + '%'; custom(); renderMain(); renderSummary(); };
+  const t = $('#t-range', I); if (t) t.oninput = () => { s.target = +t.value; t.style.setProperty('--p', (s.target - 50) / 1450 * 100 + '%'); $('#t-val').textContent = s.target + ' KB'; custom(); renderMain(); renderSummary(); };
+  $$('[data-tv]', I).forEach(b => b.onclick = () => { s.target = +b.dataset.tv; custom(); softRefresh(); });
+  $$('[data-w]', I).forEach(b => b.onclick = () => { s.maxW = +b.dataset.w; s.sizes = []; custom(); softRefresh(); });
+  $$('[data-sz]', I).forEach(b => b.onclick = () => { const v = +b.dataset.sz; s.sizes = s.sizes.includes(v) ? s.sizes.filter(x => x !== v) : [...s.sizes, v].sort((a, b) => b - a); custom(); softRefresh(); });
+  const mw = $('#maxw', I); if (mw) mw.onchange = () => { s.maxW = Math.max(1, +mw.value || 1); custom(); softRefresh(); };
+  $$('[data-tgl]', I).forEach(b => b.onclick = () => { s[b.dataset.tgl] = !s[b.dataset.tgl]; softRefresh(); });
+  $$('[data-conf]', I).forEach(b => b.onclick = () => { s.conflict = b.dataset.conf; softRefresh(); });
+  $$('[data-bg]', I).forEach(b => b.onclick = () => { s.bg = b.dataset.bg; softRefresh(); });
+  const np = $('#namepat', I); if (np) np.oninput = () => { s.name = np.value; custom(); renderMain(); const r = $('#inspector .font-mono.text-ink\\/90'); if (r && S.items.length) r.textContent = outName(selected() || S.items[0]); };
+  $$('[data-tok]', I).forEach(b => b.onclick = () => { s.name += (s.name && !s.name.endsWith('-') ? '-' : '') + b.dataset.tok; custom(); softRefresh(); });
+  const sn = $('#subname', I); if (sn) sn.oninput = () => { s.sub = sn.value; renderMain(); };
+  $('#save-preset').onclick = () => toast('Preset salvo com formato, tamanho, qualidade e subpasta', 'ok');
+}
+function softRefresh() { const st = $('#inspector').scrollTop; renderInspector(); $('#inspector').scrollTop = st; renderMain(); renderSummary(); }
+
+/* ---------- resumo + CTA ---------- */
+function renderSummary() {
+  const pend = S.items.filter(i => i.status !== 'done' && i.status !== 'kept' && i.status !== 'skipped');
+  const targets = S.items.filter(i => !S.folder || i.folder === S.folder);
+  const n = S.run.active ? S.run.total : (pend.length || S.items.length);
+  const sizesN = S.set.sizes.length || 1;
+  const before = S.items.reduce((a, i) => a + i.size, 0), after = S.items.reduce((a, i) => a + (i.out ?? preview(i)), 0);
+  const finished = S.items.length && S.items.every(i => ['done', 'kept', 'skipped'].includes(i.status));
+  const doneN = S.items.filter(i => i.status === 'done' || i.status === 'kept').length;
+  $('#summary').innerHTML = S.items.length ? `
+    <div class="min-w-0"><div class="text-[11px] font-550 text-dim">${finished ? 'Economizado' : 'Estimativa do lote'}</div>
+    <div class="font-display text-[22px] font-bold tracking-[-.02em] tabular-nums leading-tight mt-0.5 whitespace-nowrap">${fmt(before - after)} <span class="text-[12px] font-600 text-ok">−${pct((1 - after / before) * 100)}</span></div></div>
+    <div class="text-right text-[11px] text-dim tabular-nums leading-relaxed whitespace-nowrap">${fmt(before)} → ${fmt(after)}<br>${S.items.length * sizesN} arquivos${sizesN > 1 ? ` (${sizesN} tamanhos)` : ''}</div>` : '';
+  const cta = $('#cta');
+  if (S.run.active) {
+    cta.innerHTML = `<button id="cta-cancel" class="h-11 rounded-lg whitespace-nowrap text-[13px] font-600 flex items-center justify-center gap-2.5 bg-bad/15 text-bad hover:bg-bad/25 transition">${S.run.cancel ? `<svg class="ico spin"><use href="#i-refresh"/></svg>Finalizando a imagem atual…` : `${ico('stop', 'ico-sm')}Cancelar <span class="opacity-70 font-500 tabular-nums">· ${S.run.done}/${S.run.total}</span>`}</button>`;
+    $('#cta-cancel').onclick = () => { S.run.cancel = true; renderSummary(); };
+  } else if (finished) {
+    cta.innerHTML = `<button id="cta-save" class="btn-primary h-11 rounded-lg text-[13px] font-600 flex items-center justify-center gap-2">${ico('download')}Salvar ${doneN} imagens</button>
+      <button id="cta-redo" class="h-9 rounded-lg whitespace-nowrap text-[12px] font-550 text-mute hover:text-ink bg-ink/[.05] hover:bg-ink/[.09] transition flex items-center justify-center gap-2">${ico('refresh', 'ico-sm')}Compactar de novo</button>`;
+    $('#cta-save').onclick = () => toast(`${doneN} imagens salvas em <b>imagens-compactadas</b>`, 'ok');
+    $('#cta-redo').onclick = () => { S.items.forEach(i => { i.status = 'pending'; i.out = null; }); render(); };
+  } else {
+    const partial = S.items.some(i => i.status === 'done' || i.status === 'kept');
+    cta.innerHTML = `<button id="cta-go" ${S.items.length ? '' : 'disabled style="opacity:.4"'} class="btn-primary h-11 rounded-lg text-[13px] font-650 flex items-center justify-center gap-2">${ico('zap')}${!S.items.length ? 'Adicione imagens' : partial ? `Retomar ${pend.length} pendentes` : `Compactar ${S.items.length} imagens`}<span class="kbd ml-1">Ctrl ↵</span></button>`;
+    $('#cta-go').onclick = start;
+  }
+}
+
+/* ---------- barra de status ---------- */
+function renderStatus() {
+  const r = S.run, bar = $('#sb-bar');
+  const total = S.items.length;
+  const doneN = S.items.filter(i => ['done', 'kept', 'skipped'].includes(i.status)).length;
+  if (r.active) {
+    const el = (performance.now() - r.t0) / 1000, ips = r.done / Math.max(el, .1), left = ips > 0 ? (r.total - r.done) / ips : 0;
+    $('#sb-state').innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-accent pulse-dot"></span><span class="text-ink font-550">Compactando ${r.done}/${r.total}</span>`;
+    $('#sb-stats').innerHTML = `<span>${pt(ips)} img/s</span><span>~${Math.ceil(left)} s restantes</span>`;
+    bar.style.width = (r.done / r.total * 100) + '%';
+  } else if (total && doneN === total) {
+    $('#sb-state').innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-ok"></span><span class="text-ink font-550">Concluído</span>`;
+    const sec = S.lastSecs ? pt(S.lastSecs) + ' s' : '';
+    $('#sb-stats').innerHTML = `<span>${total} imagens</span>${sec ? `<span>em ${sec}</span>` : ''}`;
+    bar.style.width = '100%';
+  } else {
+    $('#sb-state').innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-ink/25"></span><span>Pronto</span>`;
+    $('#sb-stats').innerHTML = `<span>${total} na fila</span><span>${fmt(S.items.reduce((a, i) => a + i.size, 0))}</span>`;
+    bar.style.width = (doneN / Math.max(total, 1) * 100) + '%';
+  }
+}
+
+/* ---------- render principal ---------- */
+function renderMain() {
+  const list = visible();
+  const stage = $('#stage');
+  if (!S.items.length) { stage.innerHTML = renderEmpty(); $('#em-img').onclick = addImages; $('#em-add').onclick = addFolders; $('#em-paste').onclick = paste; renderToolbar(); renderBanner(); renderStatus(); renderSide(); return; }
+  const scroll = stage.firstElementChild?.scrollTop || 0;
+  stage.innerHTML = S.view === 'list' ? renderList(list) : S.view === 'grid' ? renderGrid(list) : renderCompare(list);
+  if (stage.firstElementChild && S.view !== 'compare') stage.firstElementChild.scrollTop = scroll;
+  $$('[data-id]', stage).forEach(el => el.onclick = e => {
+    const rm = e.target.closest('[data-rm]'), dl = e.target.closest('[data-dl]');
+    if (rm) { removeItem(+rm.dataset.rm); return; }
+    if (dl) { toast('Imagem salva na subpasta', 'ok'); return; }
+    S.sel = +el.dataset.id; renderMain(); renderInspector();
+  });
+  $$('[data-id]', stage).forEach(el => el.ondblclick = () => { S.sel = +el.dataset.id; S.view = 'compare'; render(); });
+  if (S.view === 'compare') wireCompare();
+  renderToolbar(); renderBanner(); renderStatus();
+  renderSide();
+}
+function render() { renderMain(); renderInspector(); renderSummary(); }
+
+function removeItem(id) {
+  const i = S.items.findIndex(x => x.id === id);
+  const [gone] = S.items.splice(i, 1);
+  if (S.sel === id) S.sel = S.items[Math.min(i, S.items.length - 1)]?.id ?? null;
+  toast(`<b>${gone.name}</b> removida`, 'info', 1800);
+  render();
+}
+
+/* ---------- ações ---------- */
+function addFolders() {
+  const more = [
+    mk('Vestido Floral Verão', 'vestido-frente.jpg', 'shirt', 330, 3300), mk('Vestido Floral Verão', 'vestido-costas.jpg', 'shirt', 330, 3050), mk('Vestido Floral Verão', 'vestido-detalhe.jpg', 'shirt', 330, 2700)
+  ];
+  S.items.push(...more); S.sel = more[0].id;
+  toast(`<b>Vestido Floral Verão</b> · 3 imagens adicionadas`, 'ok'); render();
+}
+function addImages() {
+  const n = S.items.filter(i => i.folder === 'Downloads').length;
+  const more = [mk('Downloads', `whatsapp-image-${n + 1}.jpeg`, 'bag', 150, 1850, 1600, 1200), mk('Downloads', `IMG_48${n + 21}.jpg`, 'shoe', 190, 4100, 4032, 3024)];
+  S.items.push(...more); S.sel = more[0].id; S.folder = null;
+  toast('2 imagens adicionadas', 'ok'); render();
+}
+function paste() {
+  const n = mk('Colados', `captura-${S.items.filter(i => i.folder === 'Colados').length + 1}.png`, 'bag', 200, 880, 1600, 900);
+  S.items.push(n); S.sel = n.id; toast('Imagem colada da área de transferência', 'info'); render();
+}
+
+async function start() {
+  if (S.run.active) return;
+  let pend = S.items.filter(i => !['done', 'kept', 'skipped'].includes(i.status));
+  if (!pend.length) { S.items.forEach(i => { i.status = 'pending'; i.out = null; }); pend = [...S.items]; }
+  const conflicts = pend.filter(i => i.existing);
+  let policy = S.set.conflict;
+  if (conflicts.length && policy === 'ask') {
+    policy = await conflictDialog(conflicts);
+    if (!policy) return;
+  }
+  S.run = { active: true, cancel: false, t0: performance.now(), done: 0, total: pend.length };
+  render();
+  for (const it of pend) {
+    if (S.run.cancel) break;
+    if (it.existing && policy === 'skip') { it.status = 'skipped'; S.run.done++; continue; }
+    it.status = 'processing'; renderMain(); renderStatus();
+    await sleep(190 + Math.random() * 230);
+    const e = estimate(it);
+    it.est = e.kb;
+    if (e.kb >= it.size) { it.status = 'kept'; it.out = it.size; }
+    else { it.status = 'done'; it.out = e.kb; }
+    if (it.existing && policy === 'rename') it.renamed = true;
+    S.run.done++;
+    renderMain(); renderSummary();
+  }
+  const cancelled = S.run.cancel;
+  S.lastSecs = (performance.now() - S.run.t0) / 1000;
+  S.run.active = false;
+  render();
+  const doneN = S.items.filter(i => i.status === 'done' || i.status === 'kept').length;
+  if (cancelled) toast(`Cancelado · ${doneN} concluídas foram mantidas. Retome só as pendentes.`, 'warn', 4200);
+  else { toast(`${doneN} imagens compactadas em ${pt(S.lastSecs)} s`, 'ok'); if (S.items.some(i => i.status === 'kept')) setTimeout(() => toast('Algumas ficaram maiores — mantivemos o original', 'warn', 4200), 500); }
+}
+
+/* ---------- modais ---------- */
+function modal(html, w = 520) {
+  const o = $('#overlay');
+  o.className = 'fixed inset-0 z-50 scrim fade grid place-items-center p-6';
+  o.innerHTML = `<div class="rise glass rounded-xl shadow-pop w-full overflow-hidden" style="max-width:${w}px" role="dialog" aria-modal="true">${html}</div>`;
+  o.onmousedown = e => { if (e.target === o) closeModal(); };
+}
+function closeModal() { const o = $('#overlay'); o.className = 'hidden fixed inset-0 z-50'; o.innerHTML = ''; o.onmousedown = null; if (S._resolve) { S._resolve(null); S._resolve = null; } }
+
+function conflictDialog(conflicts) {
+  return new Promise(res => {
+    S._resolve = res;
+    modal(`<div class="p-6">
+      <div class="flex items-start gap-3.5"><div class="w-10 h-10 rounded-xl grid place-items-center bg-warn/15 text-warn flex-none">${ico('alert', 'ico-lg')}</div>
+      <div><div class="text-[16px] font-semibold tracking-tight">${conflicts.length} arquivos já existem no destino</div>
+      <p class="text-[12.5px] text-mute mt-1">Encontramos versões anteriores em <span class="font-mono text-[11.5px]">${conflicts[0].folder}/${S.set.sub}/</span>. O que fazer?</p></div></div>
+      <div class="mt-4 rounded-xl bg-ink/[.04] ring-line divide-y divide-ink/5 text-[12px]">${conflicts.map(c => `<div class="flex items-center gap-3 px-3 py-2"><img src="${art(c, 72, 54)}" class="w-9 h-7 rounded object-cover"/><span class="flex-1 font-mono text-[11.5px] truncate">${outName(c)}</span><span class="text-dim tabular-nums">há 2 dias · 412 KB</span></div>`).join('')}</div>
+      <div class="mt-5 grid grid-cols-3 gap-2">
+        ${[['overwrite', 'Sobrescrever', 'substitui os arquivos'], ['rename', 'Manter os dois', 'adiciona “-2” ao nome'], ['skip', 'Pular', 'não toca nos existentes']].map(([v, t, d], i) => `<button data-pol="${v}" class="text-left rounded-xl p-3 transition ${i === 1 ? 'bg-accent/12' : 'bg-ink/[.05] hover:bg-ink/[.09]'}" style="${i === 1 ? 'box-shadow:inset 0 0 0 1px rgb(var(--accent)/.55)' : ''}"><div class="text-[13px] font-600">${t}</div><div class="text-[11px] text-mute mt-0.5">${d}</div></button>`).join('')}
+      </div>
+      <div class="mt-4 flex items-center justify-between"><label class="flex items-center gap-2 text-[12px] text-mute"><button class="toggle" role="switch" aria-checked="false" id="cf-remember" aria-label="Lembrar"></button>Lembrar minha escolha</label><button id="cf-cancel" class="text-[12px] text-mute hover:text-ink">Cancelar</button></div>
+    </div>`, 560);
+    $('#cf-remember').onclick = e => e.currentTarget.setAttribute('aria-checked', e.currentTarget.getAttribute('aria-checked') !== 'true');
+    $('#cf-cancel').onclick = closeModal;
+    $$('[data-pol]').forEach(b => b.onclick = () => { if ($('#cf-remember').getAttribute('aria-checked') === 'true') S.set.conflict = b.dataset.pol; S._resolve = null; closeModal(); res(b.dataset.pol); });
+  });
+}
+
+function openReport() {
+  const rows = S.items.filter(i => i.out != null);
+  const before = rows.reduce((a, i) => a + i.size, 0), after = rows.reduce((a, i) => a + i.out, 0);
+  modal(`<div class="p-6 pb-4">
+    <div class="flex items-center justify-between"><div><div class="text-[16px] font-semibold tracking-tight">Relatório do lote</div><div class="text-[12px] text-mute mt-0.5">${rows.length} imagens · ${outFormatLabel()} · ${S.set.mode === 'target' ? 'alvo ' + S.set.target + ' KB' : 'qualidade ' + S.set.quality + '%'}</div></div><button id="rp-x" class="w-8 h-8 grid place-items-center rounded-lg text-mute hover:text-ink hover:bg-ink/[.08]" aria-label="Fechar">${ico('x')}</button></div>
+    <div class="grid grid-cols-3 gap-3 mt-4">${[['Antes', fmt(before), ''], ['Depois', fmt(after), ''], ['Economia', fmt(before - after), 'text-ok']].map(([l, v, c]) => `<div class="rounded-lg bg-ink/[.04] ring-line px-3.5 py-3"><div class="text-[11px] text-dim font-550">${l}</div><div class="font-display text-[19px] font-bold tracking-tight tabular-nums mt-0.5 ${c}">${v}</div></div>`).join('')}</div>
+  </div>
+  <div class="max-h-[300px] overflow-y-auto mx-6 rounded-xl ring-line text-[12px]">
+    <table class="w-full tabular-nums"><thead class="sticky top-0 bg-elev text-[11px] text-dim"><tr><th class="text-left font-600 px-3 py-2">Arquivo</th><th class="text-right font-600 px-3">Antes</th><th class="text-right font-600 px-3">Depois</th><th class="text-right font-600 px-3">Redução</th></tr></thead>
+    <tbody>${rows.map(i => `<tr class="border-t border-ink/5"><td class="px-3 py-2 truncate max-w-[220px]">${i.name}</td><td class="text-right px-3 text-mute">${fmt(i.size)}</td><td class="text-right px-3">${fmt(i.out)}</td><td class="text-right px-3 font-600 ${i.status === 'kept' ? 'text-warn' : 'text-ok'}">${i.status === 'kept' ? 'mantido' : '−' + pct(reduction(i))}</td></tr>`).join('')}</tbody></table>
+  </div>
+  <div class="p-6 pt-4 flex items-center justify-end gap-2"><button id="rp-close" class="h-9 px-4 rounded-[10px] text-[12.5px] font-550 bg-ink/[.07] hover:bg-ink/[.11] transition">Fechar</button><button id="rp-csv" class="btn-primary h-9 px-4 rounded-[10px] text-[12.5px] font-600 flex items-center gap-2">${ico('download', 'ico-sm')}Exportar CSV</button></div>`, 620);
+  $('#rp-x').onclick = $('#rp-close').onclick = closeModal;
+  $('#rp-csv').onclick = () => {
+    const csv = 'pasta;arquivo;antes_kb;depois_kb;reducao_pct;status\n' + rows.map(i => [i.folder, i.name, Math.round(i.size), Math.round(i.out), reduction(i).toFixed(1).replace('.', ','), i.status].join(';')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' })); a.download = 'relatorio-guepardosys-compact.csv'; a.click();
+    toast('Relatório exportado', 'ok');
+  };
+}
+
+/* ---------- paleta de comandos ---------- */
+function openPalette() {
+  const cmds = [
+    ['zap', 'Compactar lote', 'Ctrl ↵', start], ['image-plus', 'Adicionar imagens', 'Ctrl O', addImages], ['folder', 'Adicionar pasta', 'Ctrl ⇧ O', addFolders], ['clip', 'Colar imagem da área de transferência', 'Ctrl V', paste],
+    ['compare', 'Abrir comparação', '', () => { S.view = 'compare'; render(); }], ['list', 'Ver como lista', '', () => { S.view = 'list'; render(); }], ['grid', 'Ver como grade', '', () => { S.view = 'grid'; render(); }],
+    ['file', 'Relatório do lote', '', openReport], ['sun', 'Alternar tema claro/escuro', '', toggleTheme],
+    ['trash', 'Limpar fila', '', () => { S.items = []; S.sel = null; S.folder = null; render(); }], ['refresh', 'Restaurar exemplo', '', () => { S.items = sample(); S.sel = S.items[7].id; render(); }],
+    ...PRESETS.map(p => ['sliders', 'Preset: ' + p.name, '', () => applyPreset(p.id)]),
+    ...S.items.slice(0, 40).map(i => ['image', i.name, i.folder, () => { S.sel = i.id; S.view = 'compare'; render(); }])
+  ];
+  modal(`<div class="flex items-center gap-3 px-4 h-12 hair-b"><span class="text-mute">${ico('search')}</span><input id="pal-in" class="bg-transparent outline-none flex-1 text-[14px]" placeholder="Digite um comando ou nome de imagem…" autocomplete="off"/><span class="kbd">Esc</span></div><div id="pal-list" class="max-h-[340px] overflow-y-auto p-1.5"></div>`, 560);
+  $('#overlay').classList.remove('place-items-center'); $('#overlay').classList.add('place-items-start'); $('#overlay > div').style.marginTop = '12vh';
+  let idx = 0, cur = cmds;
+  const draw = () => { $('#pal-list').innerHTML = cur.map((c, i) => `<button data-i="${i}" class="w-full flex items-center gap-3 h-10 px-3 rounded-lg text-left text-[13px] ${i === idx ? 'bg-accent/15 text-ink' : 'text-ink/85 hover:bg-ink/[.05]'}"><span class="${i === idx ? 'text-accent' : 'text-mute'}">${ico(c[0], 'ico-sm')}</span><span class="flex-1 truncate">${c[1]}</span><span class="text-[11px] text-dim">${c[2]}</span></button>`).join('') || '<div class="p-6 text-center text-[13px] text-dim">Nada encontrado</div>'; $$('#pal-list [data-i]').forEach(b => b.onclick = () => run(+b.dataset.i)); $(`#pal-list [data-i="${idx}"]`)?.scrollIntoView({ block: 'nearest' }); };
+  const run = i => { const c = cur[i]; closeModal(); c && c[3](); };
+  $('#pal-in').oninput = e => { const q = e.target.value.toLowerCase(); cur = cmds.filter(c => (c[1] + c[2]).toLowerCase().includes(q)); idx = 0; draw(); };
+  $('#pal-in').onkeydown = e => { if (e.key === 'ArrowDown') { idx = Math.min(idx + 1, cur.length - 1); draw(); e.preventDefault(); } else if (e.key === 'ArrowUp') { idx = Math.max(idx - 1, 0); draw(); e.preventDefault(); } else if (e.key === 'Enter') run(idx); };
+  draw(); $('#pal-in').focus();
+}
+
+/* ---------- tema / update ---------- */
+function toggleTheme() {
+  S.theme = S.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.classList.toggle('dark', S.theme === 'dark'); document.documentElement.classList.toggle('light', S.theme === 'light');
+  $('#theme-ico').setAttribute('href', S.theme === 'dark' ? '#i-sun' : '#i-moon');
+}
+$('#btn-theme').onclick = toggleTheme;
+$('#btn-palette').onclick = openPalette;
+$('#btn-add').onclick = addFolders;
+$('#btn-add-img').onclick = addImages;
+$('#btn-new-preset').onclick = () => $('#save-preset').click();
+$('#btn-update').onclick = async () => {
+  const b = $('#btn-update'), l = $('#update-label');
+  if (b.dataset.ready) { toast('Reiniciando para aplicar v0.1.2…', 'info'); return; }
+  b.style.minWidth = b.offsetWidth + 'px';
+  for (let p = 0; p <= 100; p += 20) { l.textContent = `Baixando ${p}%`; await sleep(220); }
+  l.textContent = 'Reiniciar'; b.dataset.ready = 1; toast('Atualização v0.1.2 pronta · reinicie quando quiser', 'ok');
+};
+$$('#view-seg button').forEach(b => b.onclick = () => { S.view = b.dataset.view; render(); });
+
+/* ---------- atalhos + drag ---------- */
+document.addEventListener('keydown', e => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (e.key === 'Escape') { if (!$('#overlay').classList.contains('hidden')) closeModal(); return; }
+  if (mod && e.key === 'k') { e.preventDefault(); openPalette(); }
+  else if (mod && e.key === 'Enter') { e.preventDefault(); start(); }
+  else if (mod && e.key.toLowerCase() === 'o') { e.preventDefault(); e.shiftKey ? addFolders() : addImages(); }
+  else if (mod && e.key.toLowerCase() === 'v' && document.activeElement.tagName !== 'INPUT') { paste(); }
+  else if (!mod && ['INPUT'].indexOf(document.activeElement.tagName) < 0) {
+    const l = visible(), i = l.findIndex(x => x.id === S.sel);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { const n = l[Math.min(i + 1, l.length - 1)]; if (n) { S.sel = n.id; renderMain(); renderInspector(); } e.preventDefault(); }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { const n = l[Math.max(i - 1, 0)]; if (n) { S.sel = n.id; renderMain(); renderInspector(); } e.preventDefault(); }
+    else if (e.key === 'Delete' && S.sel) removeItem(S.sel);
+    else if (e.key === ' ' && S.sel) { S.view = S.view === 'compare' ? 'list' : 'compare'; render(); e.preventDefault(); }
+  }
+});
+let dragN = 0;
+addEventListener('dragenter', e => { e.preventDefault(); dragN++; $('#dragveil').classList.remove('hidden'); });
+addEventListener('dragleave', () => { if (--dragN <= 0) { dragN = 0; $('#dragveil').classList.add('hidden'); } });
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('#dragveil').classList.add('hidden'); addFolders(); });
+
+render();
+</script>
+</body>
+</html>

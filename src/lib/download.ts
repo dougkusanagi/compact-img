@@ -1,4 +1,3 @@
-import JSZip from "jszip";
 import type { QueueImage } from "@/lib/image-types";
 
 type BrowserWritable = {
@@ -68,13 +67,14 @@ export async function downloadBlob(
 }
 
 export async function downloadImagesZip(images: QueueImage[], options: ZipDownloadOptions = {}) {
-  const zip = new JSZip();
   const readyImages = images.filter((image) => image.compressedBlob && image.compressedName);
 
   if (!readyImages.length) {
     return false;
   }
 
+  const { default: JSZip } = await import("jszip");
+  const zip = new JSZip();
   const folderName = options.subfolderName ? normalizeFolderName(options.subfolderName) : undefined;
   readyImages.forEach((image) => {
     const fileName = folderName

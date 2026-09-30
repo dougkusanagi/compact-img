@@ -1,11 +1,18 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import type { CompressionSettings, WorkerResponse, SelectedImage } from "@/lib/image-types";
+import type { CompressionSettings, ImageDimensions, WorkerResponse, SelectedImage } from "@/lib/image-types";
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   avif: "image/avif",
   jpeg: "image/jpeg",
   jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp"
+};
+
+const OUTPUT_MIME_BY_FORMAT: Record<CompressionSettings["outputFormat"], string> = {
+  avif: "image/avif",
+  jpeg: "image/jpeg",
   png: "image/png",
   webp: "image/webp"
 };
@@ -67,13 +74,13 @@ type SaveCompressedImageInput = {
   destinationPath?: string;
 };
 
-type NativeJpegCompressionInput = {
+type NativeCompressionInput = {
   id: string;
   sourcePath: string;
   settings: CompressionSettings;
 };
 
-function parseNativeJpegCompressionPayload(payload: ArrayBuffer) {
+function parseNativeCompressionPayload(payload: ArrayBuffer) {
   const bytes = new Uint8Array(payload);
   const headerEnd = bytes.indexOf(10);
 
@@ -106,7 +113,13 @@ function parseNativeJpegCompressionPayload(payload: ArrayBuffer) {
 export function buildSiblingDestinationPath(sourcePath: string, fileName: string) {
   const segments = sourcePath.split(/[\\/]/);
   segments.pop();
-  return [...segments, fileName].join("\\");
+  return [...segments, fileName].join(getPathSeparator(sourcePath));
+}
+
+export function getParentDirectory(path: string) {
+  const segments = path.split(/[\\/]/);
+  segments.pop();
+  return segments.join(getPathSeparator(path)) || getPathSeparator(path);
 }
 
 export function normalizeSubfolderName(value: string) {
@@ -124,7 +137,11 @@ export function isValidSubfolderName(value: string) {
 export function buildSubfolderDestinationPath(sourcePath: string, subfolderName: string, fileName: string) {
   const segments = sourcePath.split(/[\\/]/);
   segments.pop();
-  return [...segments, normalizeSubfolderName(subfolderName), fileName].join("\\");
+  return [...segments, normalizeSubfolderName(subfolderName), fileName].join(getPathSeparator(sourcePath));
+}
+
+function getPathSeparator(path: string) {
+  return path.includes("\\") ? "\\" : "/";
 }
 
 export async function chooseSavePath(sourcePath: string | undefined, fileName: string) {
@@ -174,20 +191,25 @@ export async function saveCompressedImage({
   });
 }
 
-export async function compressNativeJpeg({
+export async function readNativeImageDimensions(path: string): Promise<ImageDimensions> {
+  const [width, height] = await invoke<[number, number]>("read_image_dimensions", { path });
+  return { width, height };
+}
+
+export async function compressNativeImage({
   id,
   sourcePath,
   settings
-}: NativeJpegCompressionInput): Promise<WorkerResponse> {
-  const payload = await invoke<ArrayBuffer>("compress_jpeg_image", {
+}: NativeCompressionInput): Promise<WorkerResponse> {
+  const payload = await invoke<ArrayBuffer>("compress_image", {
     sourcePath,
     settings
   });
-  const result = parseNativeJpegCompressionPayload(payload);
+  const result = parseNativeCompressionPayload(payload);
 
   return {
     id,
-    blob: new Blob([result.contents], { type: "image/jpeg" }),
+    blob: new Blob([result.contents], { type: OUTPUT_MIME_BY_FORMAT[settings.outputFormat] }),
     originalDimensions: result.originalDimensions,
     finalDimensions: result.finalDimensions
   };
