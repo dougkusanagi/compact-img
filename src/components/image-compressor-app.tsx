@@ -26,7 +26,9 @@ import {
   saveCompressedImage
 } from "@/lib/desktop";
 import { getReduction, replaceExtension } from "@/lib/utils";
-import { BetaImageWorkspace } from "@/components/beta-image-workspace";
+import { ClassicImageWorkspace } from "@/components/classic-image-workspace";
+import { PremiumImageWorkspace } from "@/components/premium-image-workspace";
+import { LayoutSwitcher } from "@/components/layout-switcher";
 import { NoticeToaster, type Notice, type NoticeTone } from "@/components/notice-toaster";
 
 const DEFAULT_SETTINGS: CompressionSettings = {
@@ -188,7 +190,7 @@ function isAbortError(error: unknown) {
   return typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError";
 }
 
-export function ImageCompressorApp() {
+export function ImageCompressorApp({ layout = "classic" }: { layout?: "classic" | "beta" }) {
   const [settings, setSettings] = useState<CompressionSettings>(DEFAULT_SETTINGS);
   const [images, setImages] = useState<QueueImage[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
@@ -875,11 +877,13 @@ export function ImageCompressorApp() {
     };
   }, []);
 
+  const Workspace = layout === "beta" ? PremiumImageWorkspace : ClassicImageWorkspace;
+
   return (
-    <main className="min-h-screen">
+    <div data-image-compressor-app className="min-h-screen">
       <header className="sticky top-0 z-30 border-b border-foreground/10 bg-background/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-3 py-2.5 sm:px-5 xl:px-8">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-3 py-2.5 sm:gap-4 sm:px-5 xl:px-8">
+          <div className="flex items-center gap-2 sm:gap-3">
             <img
               src="/icon.svg"
               alt=""
@@ -887,12 +891,12 @@ export function ImageCompressorApp() {
               height={34}
               className="h-[34px] w-[34px] rounded-md transition-transform duration-300 hover:rotate-[-4deg] hover:scale-105"
             />
-            <h1 className="text-base font-bold tracking-tight">Compact Img</h1>
+            <h1 className="whitespace-nowrap text-sm font-bold tracking-tight sm:text-base">Compact Img</h1>
           </div>
-          <span className="hidden rounded-sm border border-foreground/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:inline-flex">Beta</span>
+          <LayoutSwitcher layout={layout} />
         </div>
       </header>
-      <BetaImageWorkspace
+      <Workspace
           settings={settings}
           onSettingsChange={handleSettingsChange}
           downloadPreferences={downloadPreferences}
@@ -919,6 +923,6 @@ export function ImageCompressorApp() {
           onDownloadAllWeb={downloadAllWeb}
       />
       <NoticeToaster notices={notices} onDismiss={dismissNotice} />
-    </main>
+    </div>
   );
 }

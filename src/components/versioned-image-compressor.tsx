@@ -1,7 +1,9 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { ImageCompressorApp } from "@/components/image-compressor-app";
 
 export function VersionedImageCompressor() {
-  return <ImageCompressorApp />;
+  const pathname = usePathname();
+  return <ImageCompressorApp layout={pathname?.replace(/\/$/, "") === "/beta" ? "beta" : "classic"} />;
 }

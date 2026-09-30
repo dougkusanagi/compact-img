@@ -28,6 +28,25 @@ o servidor Vite+ genérico e pode abrir outra porta sem servir esta aplicação.
 Se estiver usando VITE+, `vpr dev` também pode executar o script do projeto;
 `bun run dev` é o comando recomendado.
 
+## Layouts disponíveis
+
+- `/`: layout atual, usado como padrão.
+- `/beta/`: novo layout baseado em `prototype/premium-ui-v2.html`, em fase de testes.
+
+Use **Atual / Novo Beta** no cabeçalho para alternar. A navegação dentro do app
+preserva a fila, os resultados, as configurações e o processamento em andamento.
+Os arquivos permanecem na memória da sessão; recarregar a página limpa a fila.
+
+O novo layout oferece presets, fila agrupada por pasta, ajustes em painel lateral,
+comparação em tela cheia e ações de processamento e download no rodapé. Os números
+exibidos vêm dos arquivos reais. Peso-alvo, estimativas antes da compactação e
+estatísticas históricas simuladas do protótipo não fazem parte desta versão.
+
+## Branches
+
+`main` é a única branch principal. `dev` reúne o desenvolvimento e a validação da
+interface beta antes de sua promoção. O histórico da antiga `master` foi preservado.
+
 ## Rodando a versao desktop
 
 O Tauri inicia o servidor de desenvolvimento do Next e abre a janela nativa:

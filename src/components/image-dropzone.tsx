@@ -20,6 +20,7 @@ type ImageDropzoneProps = {
   onInvalidFiles: (names: string[]) => void;
   isDesktop: boolean;
   compact?: boolean;
+  appearance?: "default" | "premium";
   mode?: "dropzone" | "button" | "overlay";
   disabled?: boolean;
   enableNativeDragDrop?: boolean;
@@ -31,6 +32,7 @@ export function ImageDropzone({
   onInvalidFiles,
   isDesktop,
   compact = false,
+  appearance = "default",
   mode = "dropzone",
   disabled = false,
   enableNativeDragDrop = true,
@@ -347,6 +349,7 @@ export function ImageDropzone({
       className={cn(
         "dropzone-surface group relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed bg-card px-6 py-10 text-center transition-[border-color,background-color] duration-200 sm:px-10",
         compact ? "min-h-[360px] lg:min-h-[580px]" : "min-h-80",
+        appearance === "premium" && "min-h-[480px] rounded-[20px] bg-card/55 sm:min-h-[520px]",
         isImporting || disabled
           ? "border-brand/50"
           : dragActive
@@ -369,19 +372,19 @@ export function ImageDropzone({
           <UploadCloud className="h-8 w-8" />
         )}
       </div>
-      <h2 className="text-[24px] font-semibold leading-tight tracking-[-0.03em] text-foreground sm:text-[27px]">
+      <h2 className={cn("text-[24px] font-semibold leading-tight tracking-[-0.03em] text-foreground sm:text-[27px]", appearance === "premium" && "max-w-[320px] text-[30px] sm:text-[34px]")}>
         {isImporting
           ? `Carregando ${importingCount} ${importingCount === 1 ? "imagem" : "imagens"}...`
           : dragActive
             ? "Pode soltar suas imagens"
-            : "Solte suas imagens aqui"}
+            : appearance === "premium" ? "Arraste suas fotos para começar" : "Solte suas imagens aqui"}
       </h2>
       <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
         {disabled
           ? "Aguarde a conclusão do processamento para adicionar arquivos."
           : isImporting
             ? "Preparando os arquivos para exibir na lista. Isso pode levar alguns segundos."
-            : "Arraste arquivos para esta área ou escolha no seu dispositivo."}
+            : appearance === "premium" ? "Compacte dezenas de imagens de uma vez. Tudo acontece neste computador, nada é enviado." : "Arraste arquivos para esta área ou escolha no seu dispositivo."}
       </p>
       <button
         type="button"
