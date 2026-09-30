@@ -77,9 +77,9 @@ const FORMAT_OPTIONS: { value: OutputFormat; label: string }[] = [
 
 const SIZE_PRESET_OPTIONS = [
   { value: "original", label: "Original" },
-  { value: "web", label: "Web" },
   { value: "hd", label: "Full HD" },
-  { value: "4k", label: "4K" }
+  { value: "4k", label: "4K" },
+  { value: "custom", label: "Personalizado" }
 ] as const;
 
 const JPEG_MODE_OPTIONS = [
@@ -151,32 +151,34 @@ export function OutputSettings({
 
   const activeSizePreset = settings.preserveOriginalDimensions
     ? "original"
-    : !settings.keepAspectRatio
-      ? "custom"
-      : settings.maxWidth === 1920 && settings.maxHeight === 1080
+    : settings.sizePreset ?? (settings.maxWidth === 1920 && settings.maxHeight === 1080
       ? "hd"
       : settings.maxWidth === 3840 && settings.maxHeight === 2160
         ? "4k"
-        : settings.maxWidth === 2000 && settings.maxHeight === 2000
-          ? "web"
-          : "custom";
+        : "custom");
 
-  const setSizePreset = (preset: "original" | "web" | "hd" | "4k") => {
+  const setSizePreset = (preset: "original" | "custom" | "hd" | "4k") => {
     if (preset === "original") {
       onSettingsChange({ ...settings, preserveOriginalDimensions: true });
       return;
     }
-    const dimensions = preset === "web"
-      ? { maxWidth: 2000, maxHeight: 2000 }
-      : preset === "hd"
+    if (preset === "custom") {
+      onSettingsChange({ ...settings, sizePreset: "custom", preserveOriginalDimensions: false });
+      return;
+    }
+    const dimensions = preset === "hd"
         ? { maxWidth: 1920, maxHeight: 1080 }
         : { maxWidth: 3840, maxHeight: 2160 };
     onSettingsChange({
       ...settings,
       ...dimensions,
+      sizePreset: preset,
       keepAspectRatio: true,
       preserveOriginalDimensions: false
     });
+  };
+  const updateDimension = (key: "maxWidth" | "maxHeight", value: string) => {
+    onSettingsChange({ ...settings, [key]: Math.max(1, Math.min(10000, Number(value) || 1)), sizePreset: "custom", preserveOriginalDimensions: false });
   };
 
   return (
@@ -263,7 +265,7 @@ export function OutputSettings({
                     max={10000}
                     value={settings.maxWidth}
                     disabled={disabled}
-                    onChange={(event) => update("maxWidth", Math.max(1, Number(event.target.value) || 1))}
+                    onChange={(event) => updateDimension("maxWidth", event.target.value)}
                     className="h-9 pr-9 text-sm tabular-nums"
                   />
                   <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/70">px</span>
@@ -296,7 +298,7 @@ export function OutputSettings({
                     max={10000}
                     value={settings.maxHeight}
                     disabled={disabled}
-                    onChange={(event) => update("maxHeight", Math.max(1, Number(event.target.value) || 1))}
+                    onChange={(event) => updateDimension("maxHeight", event.target.value)}
                     className="h-9 pr-9 text-sm tabular-nums"
                   />
                   <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/70">px</span>

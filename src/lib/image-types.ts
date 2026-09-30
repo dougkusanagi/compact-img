@@ -5,6 +5,7 @@ export type JpegCompressionMode = "fast" | "balanced" | "max";
 
 export type CompressionSettings = {
   preserveOriginalDimensions: boolean;
+  sizePreset?: "hd" | "4k" | "custom";
   maxWidth: number;
   maxHeight: number;
   quality: number;

@@ -195,7 +195,7 @@ export function PremiumImageWorkspace(props: ImageWorkspaceProps) {
   const presetOptions = [...[...PRESETS, ...customPresets].map(({ value, label }) => ({ value, label })), ...(preset === "custom" ? [{ value: "custom", label: "Personalizado" }] : [])];
   const applyPreset = (value: string) => {
     const next = [...PRESETS, ...customPresets].find((item) => item.value === value);
-    if (next) props.onSettingsChange(customPresets.some((p) => p.value === value) ? { ...settings, ...next.settings } : { ...settings, ...next.settings, preserveOriginalDimensions: false, keepAspectRatio: true });
+    if (next) props.onSettingsChange(customPresets.some((p) => p.value === value) ? { ...settings, ...next.settings } : { ...settings, ...next.settings, sizePreset: value === "small" ? "hd" : "custom", preserveOriginalDimensions: false, keepAspectRatio: true });
   };
   const sizeLabel = settings.preserveOriginalDimensions ? "Original" : `${settings.maxWidth} × ${settings.maxHeight} px`;
   const destinationLabel = downloadPreferences.mode === "choose-location" ? "Você escolhe"
